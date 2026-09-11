@@ -2,16 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/auth_provider.dart';
+import '../providers/sessions_provider.dart';
 import '../providers/workout_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 
-class ExerciseSummaryScreen extends ConsumerWidget {
+class ExerciseSummaryScreen extends ConsumerStatefulWidget {
   const ExerciseSummaryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExerciseSummaryScreen> createState() =>
+      _ExerciseSummaryScreenState();
+}
+
+class _ExerciseSummaryScreenState extends ConsumerState<ExerciseSummaryScreen> {
+  bool _saving = false;
+
+  Future<void> _saveAndContinue() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
+    final session = ref.read(lastSessionProvider);
+    final user = ref.read(authProvider);
+    if (session != null && user != null) {
+      await saveWorkoutSession(uid: user.uid, session: session);
+    }
+
+    if (!mounted) return;
+    context.go('/home');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(lastSessionProvider);
     final scheme = Theme.of(context).colorScheme;
 
@@ -71,15 +95,14 @@ class ExerciseSummaryScreen extends ConsumerWidget {
                 ],
               ),
               const Spacer(),
-              Text(
-                'Dummy stats for now — save will later write to your history.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
+              if (_saving)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
               PrimaryButton(
-                label: 'Save & Continue',
-                onPressed: () => context.go('/home'),
+                label: _saving ? 'Saving…' : 'Save & Continue',
+                onPressed: _saving ? null : _saveAndContinue,
               ),
             ],
           ),
