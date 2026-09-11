@@ -21,20 +21,22 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/onboarding',
     refreshListenable: refresh,
     redirect: (context, state) {
-      final auth = ref.read(authProvider);
+      final user = ref.read(authProvider);
+      final onboardingComplete = ref.read(onboardingCompleteProvider);
       final loc = state.matchedLocation;
 
       final onOnboarding = loc == '/onboarding';
       final onAuth = loc == '/auth';
+      final loggedIn = user != null;
 
-      if (!auth.onboardingComplete && !onOnboarding) {
+      if (loggedIn && (onOnboarding || onAuth)) {
+        return '/home';
+      }
+      if (!loggedIn && !onboardingComplete && !onOnboarding) {
         return '/onboarding';
       }
-      if (auth.onboardingComplete && !auth.isLoggedIn && !onAuth) {
+      if (!loggedIn && onboardingComplete && !onAuth) {
         return '/auth';
-      }
-      if (auth.isLoggedIn && (onOnboarding || onAuth)) {
-        return '/home';
       }
       return null;
     },
@@ -110,6 +112,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
 class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
-    ref.listen<AuthState>(authProvider, (previous, next) => notifyListeners());
+    ref.listen(authProvider, (previous, next) => notifyListeners());
+    ref.listen(onboardingCompleteProvider, (previous, next) => notifyListeners());
   }
 }

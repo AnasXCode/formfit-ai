@@ -13,11 +13,14 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final auth = ref.watch(authProvider);
+    final profile = ref.watch(currentUserProvider);
+    final authUser = ref.watch(authProvider);
     final scheme = Theme.of(context).colorScheme;
-    final displayName = auth.isGuest ? 'Guest Athlete' : user.name;
-    final join = _formatJoin(user.joinDate);
+    final isGuest = authUser?.isAnonymous ?? true;
+    final displayName = isGuest
+        ? 'Guest Athlete'
+        : (authUser?.displayName ?? profile.name);
+    final join = _formatJoin(profile.joinDate);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -30,7 +33,7 @@ class ProfileScreen extends ConsumerWidget {
                 radius: 44,
                 backgroundColor: AppColors.accent.withValues(alpha: 0.18),
                 child: Text(
-                  auth.isGuest ? 'G' : user.initials,
+                  isGuest ? 'G' : profile.initials,
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
@@ -55,19 +58,19 @@ class ProfileScreen extends ConsumerWidget {
             children: [
               StatChip(
                 label: 'Workouts',
-                value: '${user.totalWorkouts}',
+                value: '${profile.totalWorkouts}',
                 icon: Icons.fitness_center_rounded,
               ),
               const SizedBox(width: 10),
               StatChip(
                 label: 'Total reps',
-                value: '${user.totalReps}',
+                value: '${profile.totalReps}',
                 icon: Icons.repeat_rounded,
               ),
               const SizedBox(width: 10),
               StatChip(
                 label: 'Best streak',
-                value: '${user.bestStreak}d',
+                value: '${profile.bestStreak}d',
                 icon: Icons.local_fire_department_rounded,
               ),
             ],
@@ -96,9 +99,9 @@ class ProfileScreen extends ConsumerWidget {
                 title: 'Logout',
                 subtitle: 'Return to sign-in',
                 destructive: true,
-                onTap: () {
-                  ref.read(authProvider.notifier).logout();
-                  context.go('/auth');
+                onTap: () async {
+                  await ref.read(authProvider.notifier).signOut();
+                  if (context.mounted) context.go('/auth');
                 },
               ),
             ],

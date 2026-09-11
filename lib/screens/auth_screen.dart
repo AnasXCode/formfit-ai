@@ -1,16 +1,50 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/primary_button.dart';
 
-class AuthScreen extends ConsumerWidget {
+class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends ConsumerState<AuthScreen> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } catch (error) {
+      if (!mounted) return;
+      if (_isCanceled(error)) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_messageFor(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  bool _isCanceled(Object error) {
+    return error is GoogleSignInException &&
+        error.code == GoogleSignInExceptionCode.canceled;
+  }
+
+  String _messageFor(Object error) {
+    if (error is FirebaseException) return error.message ?? error.code;
+    return error.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -47,27 +81,25 @@ class AuthScreen extends ConsumerWidget {
                     ),
               ),
               const Spacer(flex: 3),
+              if (_busy)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 24),
+                  child: CircularProgressIndicator(),
+                ),
               PrimaryButton(
                 label: 'Continue with Google',
                 icon: Icons.g_mobiledata_rounded,
-                onPressed: () {
-                  ref.read(authProvider.notifier).continueWithGoogle();
-                  context.go('/home');
-                },
+                onPressed: _busy
+                    ? null
+                    : () => _run(ref.read(authProvider.notifier).signInWithGoogle),
               ),
               const SizedBox(height: 12),
               SecondaryButton(
                 label: 'Continue as Guest',
                 icon: Icons.person_outline_rounded,
-                onPressed: () {
-                  ref.read(authProvider.notifier).continueAsGuest();
-                  context.go('/home');
-                },
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'UI only — no real sign-in yet.',
-                style: Theme.of(context).textTheme.labelSmall,
+                onPressed: _busy
+                    ? null
+                    : () => _run(ref.read(authProvider.notifier).signInAsGuest),
               ),
             ],
           ),

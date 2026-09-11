@@ -12,7 +12,20 @@
           "package_name": "com.example.formfit_ai"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "726996368880-uhdfanq2986g62imhbouimvpjkfh3t8j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.formfit_ai",
+            "certificate_hash": "25a215908dc3edc04a22b0f879c9e4e3d16188da"
+          }
+        },
+        {
+          "client_id": "726996368880-btuqnnq9m49p8v0qqhln6ish9iu5g90q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAzvX_8OvGlGOM35uwwUX9Tkbxj5knlSIU"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "726996368880-btuqnnq9m49p8v0qqhln6ish9iu5g90q.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "726996368880-lcv1bo7kaufltqrjtvtbv4fivj3cmkka.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.formfitAi"
+              }
+            }
+          ]
         }
       }
     }

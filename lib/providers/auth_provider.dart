@@ -1,63 +1,78 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
-enum AuthStatus { unknown, unauthenticated, authenticated }
-
-class AuthState {
-  const AuthState({
-    this.onboardingComplete = false,
-    this.status = AuthStatus.unauthenticated,
-    this.isGuest = false,
-  });
-
-  final bool onboardingComplete;
-  final AuthStatus status;
-  final bool isGuest;
-
-  bool get isLoggedIn => status == AuthStatus.authenticated;
-
-  AuthState copyWith({
-    bool? onboardingComplete,
-    AuthStatus? status,
-    bool? isGuest,
-  }) {
-    return AuthState(
-      onboardingComplete: onboardingComplete ?? this.onboardingComplete,
-      status: status ?? this.status,
-      isGuest: isGuest ?? this.isGuest,
-    );
+class AuthNotifier extends StateNotifier<User?> {
+  AuthNotifier() : super(_initialUser()) {
+    if (Firebase.apps.isEmpty) return;
+    _subscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      state = user;
+    });
   }
-}
 
-class AuthNotifier extends Notifier<AuthState> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  StreamSubscription<User?>? _subscription;
+  bool _googleInitialized = false;
+
+  static User? _initialUser() {
+    if (Firebase.apps.isEmpty) return null;
+    return FirebaseAuth.instance.currentUser;
+  }
+
+  Future<void> _ensureGoogleInitialized() async {
+    if (_googleInitialized) return;
+    await _googleSignIn.initialize();
+    _googleInitialized = true;
+  }
+
+  Future<void> signInWithGoogle() async {
+    await _ensureGoogleInitialized();
+    final googleUser = await _googleSignIn.authenticate();
+    final idToken = googleUser.authentication.idToken;
+    if (idToken == null) {
+      throw StateError('Google Sign-In did not return an ID token.');
+    }
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
+    await _auth.signInWithCredential(credential);
+  }
+
+  Future<void> signInAsGuest() async {
+    await _auth.signInAnonymously();
+  }
+
+  Future<void> signOut() async {
+    await _auth.signOut();
+    try {
+      await _ensureGoogleInitialized();
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // Guest sessions never authenticate with Google.
+    }
+  }
+
   @override
-  AuthState build() => const AuthState();
-
-  void completeOnboarding() {
-    state = state.copyWith(onboardingComplete: true);
-  }
-
-  void continueWithGoogle() {
-    state = state.copyWith(
-      onboardingComplete: true,
-      status: AuthStatus.authenticated,
-      isGuest: false,
-    );
-  }
-
-  void continueAsGuest() {
-    state = state.copyWith(
-      onboardingComplete: true,
-      status: AuthStatus.authenticated,
-      isGuest: true,
-    );
-  }
-
-  void logout() {
-    state = state.copyWith(
-      status: AuthStatus.unauthenticated,
-      isGuest: false,
-    );
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }
 
-final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+final authProvider = StateNotifierProvider<AuthNotifier, User?>((ref) {
+  return AuthNotifier();
+});
+
+/// In-memory onboarding flag (not persisted yet).
+class OnboardingNotifier extends StateNotifier<bool> {
+  OnboardingNotifier() : super(false);
+
+  void complete() => state = true;
+}
+
+final onboardingCompleteProvider =
+    StateNotifierProvider<OnboardingNotifier, bool>((ref) {
+  return OnboardingNotifier();
+});

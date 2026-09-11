@@ -14,10 +14,14 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final auth = ref.watch(authProvider);
+    final profile = ref.watch(currentUserProvider);
+    final authUser = ref.watch(authProvider);
     final exercises = ref.watch(exercisesProvider);
-    final name = auth.isGuest ? 'Guest' : user.name.split(' ').first;
+    final isGuest = authUser?.isAnonymous ?? true;
+    final name = isGuest
+        ? 'Guest'
+        : (authUser?.displayName?.split(' ').first ??
+            profile.name.split(' ').first);
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good morning'
@@ -36,7 +40,7 @@ class HomeScreen extends ConsumerWidget {
                   radius: 26,
                   backgroundColor: AppColors.accent.withValues(alpha: 0.18),
                   child: Text(
-                    auth.isGuest ? 'G' : user.initials,
+                    isGuest ? 'G' : profile.initials,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       color: AppColors.accent,
@@ -80,7 +84,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Rank #${user.rank}',
+                        'Rank #${profile.rank}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ],
@@ -93,19 +97,19 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 StatChip(
                   label: "Today's reps",
-                  value: '${user.todayReps}',
+                  value: '${profile.todayReps}',
                   icon: Icons.flash_on_rounded,
                 ),
                 const SizedBox(width: 10),
                 StatChip(
                   label: 'Streak',
-                  value: '${user.currentStreak}d',
+                  value: '${profile.currentStreak}d',
                   icon: Icons.local_fire_department_rounded,
                 ),
                 const SizedBox(width: 10),
                 StatChip(
                   label: 'This week',
-                  value: '${user.weeklyTotal}',
+                  value: '${profile.weeklyTotal}',
                   icon: Icons.calendar_view_week_rounded,
                 ),
               ],

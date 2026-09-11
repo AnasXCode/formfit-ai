@@ -45,7 +45,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _finish() {
-    ref.read(authProvider.notifier).completeOnboarding();
+    ref.read(onboardingCompleteProvider.notifier).complete();
     context.go('/auth');
   }
 
