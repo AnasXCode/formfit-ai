@@ -3,12 +3,42 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/exercise.dart';
 import '../models/leaderboard_entry.dart';
-import '../models/user_profile.dart';
 import '../models/workout_session.dart';
 
-final currentUserProvider = Provider<UserProfile>((ref) {
-  return UserProfile(
-    id: 'me',
+/// Placeholder dashboard numbers until workouts are stored in Firestore.
+class DummyUserStats {
+  const DummyUserStats({
+    required this.name,
+    required this.rank,
+    required this.joinDate,
+    required this.totalWorkouts,
+    required this.totalReps,
+    required this.bestStreak,
+    required this.currentStreak,
+    required this.todayReps,
+    required this.weeklyTotal,
+  });
+
+  final String name;
+  final int rank;
+  final DateTime joinDate;
+  final int totalWorkouts;
+  final int totalReps;
+  final int bestStreak;
+  final int currentStreak;
+  final int todayReps;
+  final int weeklyTotal;
+
+  String get initials {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first[0] + parts.last[0]).toUpperCase();
+  }
+}
+
+final currentUserProvider = Provider<DummyUserStats>((ref) {
+  return DummyUserStats(
     name: 'Alex Rivera',
     rank: 4,
     joinDate: DateTime(2026, 3, 12),

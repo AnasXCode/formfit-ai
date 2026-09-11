@@ -1,50 +1,71 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserProfile {
   const UserProfile({
-    required this.id,
-    required this.name,
-    required this.rank,
-    required this.joinDate,
-    required this.totalWorkouts,
-    required this.totalReps,
-    required this.bestStreak,
-    required this.currentStreak,
-    required this.todayReps,
-    required this.weeklyTotal,
-    this.isGuest = false,
+    required this.uid,
+    required this.displayName,
+    required this.email,
+    required this.isGuest,
+    required this.createdAt,
+    required this.lastLoginAt,
+    this.photoUrl,
   });
 
-  final String id;
-  final String name;
-  final int rank;
-  final DateTime joinDate;
-  final int totalWorkouts;
-  final int totalReps;
-  final int bestStreak;
-  final int currentStreak;
-  final int todayReps;
-  final int weeklyTotal;
+  final String uid;
+  final String displayName;
+  final String email;
+  final String? photoUrl;
   final bool isGuest;
+  final Timestamp createdAt;
+  final Timestamp lastLoginAt;
 
   String get initials {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty) return '?';
+    final parts = displayName.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return '?';
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
-  UserProfile copyWith({String? name, bool? isGuest}) {
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'displayName': displayName,
+      'email': email,
+      'photoUrl': photoUrl,
+      'isGuest': isGuest,
+      'createdAt': createdAt,
+      'lastLoginAt': lastLoginAt,
+    };
+  }
+
+  factory UserProfile.fromMap(Map<String, dynamic> map) {
     return UserProfile(
-      id: id,
-      name: name ?? this.name,
-      rank: rank,
-      joinDate: joinDate,
-      totalWorkouts: totalWorkouts,
-      totalReps: totalReps,
-      bestStreak: bestStreak,
-      currentStreak: currentStreak,
-      todayReps: todayReps,
-      weeklyTotal: weeklyTotal,
-      isGuest: isGuest ?? this.isGuest,
+      uid: map['uid'] as String? ?? '',
+      displayName: map['displayName'] as String? ?? '',
+      email: map['email'] as String? ?? '',
+      photoUrl: map['photoUrl'] as String?,
+      isGuest: map['isGuest'] as bool? ?? false,
+      createdAt: _timestamp(map['createdAt']),
+      lastLoginAt: _timestamp(map['lastLoginAt']),
     );
+  }
+
+  factory UserProfile.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    if (data == null) {
+      throw StateError('User profile ${doc.id} has no data.');
+    }
+    return UserProfile.fromMap({
+      ...data,
+      'uid': data['uid'] ?? doc.id,
+    });
+  }
+
+  static Timestamp _timestamp(Object? value) {
+    if (value is Timestamp) return value;
+    if (value is DateTime) return Timestamp.fromDate(value);
+    return Timestamp.now();
   }
 }
