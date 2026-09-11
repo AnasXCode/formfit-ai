@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "726996368880",
+    "project_id": "formfit-ai-84d42",
+    "storage_bucket": "formfit-ai-84d42.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:726996368880:android:2b5fa1837e60f237057135",
+        "android_client_info": {
+          "package_name": "com.example.formfit_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzvX_8OvGlGOM35uwwUX9Tkbxj5knlSIU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,30 +1,55 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:formfit_ai/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('onboarding, auth, tabs, and exercise flow', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: FormFitApp()));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Train with AI spotting'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('See your progress'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('FormFit AI'), findsOneWidget);
+    expect(find.text('Continue as Guest'), findsOneWidget);
+
+    await tester.tap(find.text('Continue as Guest'));
+    await tester.pumpAndSettle();
+    expect(find.text('Push-Ups'), findsWidgets);
+    expect(find.text('Home'), findsOneWidget);
+
+    await tester.tap(find.text('Start'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('End session'), findsOneWidget);
+    expect(find.text('Camera preview'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.text('End session'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Session complete'), findsOneWidget);
+
+    await tester.tap(find.text('Save & Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Push-Ups'), findsWidgets);
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    expect(find.text('History'), findsWidgets);
+
+    await tester.tap(find.text('Leaderboard'));
+    await tester.pumpAndSettle();
+    expect(find.text('This Week'), findsOneWidget);
+    expect(find.text('Jordan Lee'), findsOneWidget);
+
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Guest Athlete'), findsOneWidget);
+    expect(find.text('Logout'), findsOneWidget);
   });
 }
