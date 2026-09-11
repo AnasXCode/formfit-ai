@@ -2,25 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dummy_data.dart';
-import '../theme/app_colors.dart';
+import '../providers/user_profile_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stat_chip.dart';
+import '../widgets/user_avatar.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(currentUserProvider);
+    final stats = ref.watch(currentUserProvider);
     final authUser = ref.watch(authProvider);
+    final firestoreProfile = ref.watch(userProfileProvider).when(
+          data: (UserProfile? value) => value,
+          loading: () => null,
+          error: (Object _, StackTrace _) => null,
+        );
     final scheme = Theme.of(context).colorScheme;
     final isGuest = authUser?.isAnonymous ?? true;
     final displayName = isGuest
         ? 'Guest Athlete'
-        : (authUser?.displayName ?? profile.name);
-    final join = _formatJoin(profile.joinDate);
+        : (authUser?.displayName ??
+            firestoreProfile?.displayName ??
+            stats.name);
+    final joinDate = firestoreProfile?.createdAt.toDate() ?? stats.joinDate;
+    final join = _formatJoin(joinDate);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -29,17 +39,12 @@ class ProfileScreen extends ConsumerWidget {
         children: [
           Column(
             children: [
-              CircleAvatar(
+              UserAvatar(
                 radius: 44,
-                backgroundColor: AppColors.accent.withValues(alpha: 0.18),
-                child: Text(
-                  isGuest ? 'G' : profile.initials,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.accent,
-                  ),
-                ),
+                fontSize: 28,
+                photoUrl: firestoreProfile?.photoUrl,
+                initials: firestoreProfile?.initials ??
+                    (isGuest ? 'G' : stats.initials),
               ),
               const SizedBox(height: 14),
               Text(
@@ -56,21 +61,24 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           Row(
             children: [
+              // TODO: replace with real sessions data
               StatChip(
                 label: 'Workouts',
-                value: '${profile.totalWorkouts}',
+                value: '${stats.totalWorkouts}',
                 icon: Icons.fitness_center_rounded,
               ),
               const SizedBox(width: 10),
+              // TODO: replace with real sessions data
               StatChip(
                 label: 'Total reps',
-                value: '${profile.totalReps}',
+                value: '${stats.totalReps}',
                 icon: Icons.repeat_rounded,
               ),
               const SizedBox(width: 10),
+              // TODO: replace with real sessions data
               StatChip(
                 label: 'Best streak',
-                value: '${profile.bestStreak}d',
+                value: '${stats.bestStreak}d',
                 icon: Icons.local_fire_department_rounded,
               ),
             ],

@@ -20,9 +20,12 @@ class UserProfile {
   final Timestamp lastLoginAt;
 
   String get initials {
-    final parts = displayName.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    final trimmed = displayName.trim();
+    if (trimmed.isEmpty) return isGuest ? 'G' : '?';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 

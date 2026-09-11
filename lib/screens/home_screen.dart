@@ -2,26 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dummy_data.dart';
+import '../providers/user_profile_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/exercise_card.dart';
 import '../widgets/stat_chip.dart';
+import '../widgets/user_avatar.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(currentUserProvider);
+    final stats = ref.watch(currentUserProvider);
     final authUser = ref.watch(authProvider);
+    final firestoreProfile = ref.watch(userProfileProvider).when(
+          data: (UserProfile? value) => value,
+          loading: () => null,
+          error: (Object _, StackTrace _) => null,
+        );
     final exercises = ref.watch(exercisesProvider);
     final isGuest = authUser?.isAnonymous ?? true;
     final name = isGuest
         ? 'Guest'
         : (authUser?.displayName?.split(' ').first ??
-            profile.name.split(' ').first);
+            firestoreProfile?.displayName.split(' ').first ??
+            stats.name.split(' ').first);
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good morning'
@@ -36,16 +45,11 @@ class HomeScreen extends ConsumerWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
+                UserAvatar(
                   radius: 26,
-                  backgroundColor: AppColors.accent.withValues(alpha: 0.18),
-                  child: Text(
-                    isGuest ? 'G' : profile.initials,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.accent,
-                    ),
-                  ),
+                  photoUrl: firestoreProfile?.photoUrl,
+                  initials: firestoreProfile?.initials ??
+                      (isGuest ? 'G' : stats.initials),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -84,7 +88,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Rank #${profile.rank}',
+                        'Rank #${stats.rank}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ],
@@ -97,19 +101,19 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 StatChip(
                   label: "Today's reps",
-                  value: '${profile.todayReps}',
+                  value: '${stats.todayReps}',
                   icon: Icons.flash_on_rounded,
                 ),
                 const SizedBox(width: 10),
                 StatChip(
                   label: 'Streak',
-                  value: '${profile.currentStreak}d',
+                  value: '${stats.currentStreak}d',
                   icon: Icons.local_fire_department_rounded,
                 ),
                 const SizedBox(width: 10),
                 StatChip(
                   label: 'This week',
-                  value: '${profile.weeklyTotal}',
+                  value: '${stats.weeklyTotal}',
                   icon: Icons.calendar_view_week_rounded,
                 ),
               ],

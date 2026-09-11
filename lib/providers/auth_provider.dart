@@ -17,8 +17,8 @@ class AuthNotifier extends StateNotifier<User?> {
     });
   }
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   StreamSubscription<User?>? _subscription;
   bool _googleInitialized = false;
