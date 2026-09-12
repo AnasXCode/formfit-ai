@@ -7,12 +7,14 @@ class UserAvatar extends StatelessWidget {
     super.key,
     required this.initials,
     this.photoUrl,
+    this.avatarColorHex,
     this.radius = 26,
     this.fontSize = 16,
   });
 
   final String initials;
   final String? photoUrl;
+  final String? avatarColorHex;
   final double radius;
   final double fontSize;
 
@@ -21,13 +23,14 @@ class UserAvatar extends StatelessWidget {
     final url = photoUrl?.trim();
     final hasPhoto = url != null && url.isNotEmpty;
     final size = radius * 2;
+    final accent = AppColors.tryParseHex(avatarColorHex) ?? AppColors.accent;
 
     return ClipOval(
       child: SizedBox(
         width: size,
         height: size,
         child: ColoredBox(
-          color: AppColors.accent.withValues(alpha: 0.18),
+          color: accent.withValues(alpha: 0.18),
           child: hasPhoto
               ? Image.network(
                   url,
@@ -37,13 +40,28 @@ class UserAvatar extends StatelessWidget {
                   gaplessPlayback: true,
                   loadingBuilder: (context, child, progress) {
                     if (progress == null) return child;
-                    return _Fallback(initials: initials, fontSize: fontSize, radius: radius);
+                    return _Fallback(
+                      initials: initials,
+                      fontSize: fontSize,
+                      radius: radius,
+                      accent: accent,
+                    );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    return _Fallback(initials: initials, fontSize: fontSize, radius: radius);
+                    return _Fallback(
+                      initials: initials,
+                      fontSize: fontSize,
+                      radius: radius,
+                      accent: accent,
+                    );
                   },
                 )
-              : _Fallback(initials: initials, fontSize: fontSize, radius: radius),
+              : _Fallback(
+                  initials: initials,
+                  fontSize: fontSize,
+                  radius: radius,
+                  accent: accent,
+                ),
         ),
       ),
     );
@@ -55,11 +73,13 @@ class _Fallback extends StatelessWidget {
     required this.initials,
     required this.fontSize,
     required this.radius,
+    required this.accent,
   });
 
   final String initials;
   final double fontSize;
   final double radius;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +91,7 @@ class _Fallback extends StatelessWidget {
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
-            color: AppColors.accent,
+            color: accent,
           ),
         ),
       );
@@ -80,7 +100,7 @@ class _Fallback extends StatelessWidget {
     return Center(
       child: Icon(
         Icons.person_rounded,
-        color: AppColors.accent,
+        color: accent,
         size: radius,
       ),
     );

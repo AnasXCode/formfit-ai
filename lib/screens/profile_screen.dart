@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,15 +7,23 @@ import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dummy_data.dart';
 import '../providers/user_profile_provider.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stat_chip.dart';
 import '../widgets/user_avatar.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _linking = false;
+
+  @override
+  Widget build(BuildContext context) {
     final stats = ref.watch(currentUserProvider);
     final authUser = ref.watch(authProvider);
     final firestoreProfile = ref.watch(userProfileProvider).when(
@@ -24,11 +33,10 @@ class ProfileScreen extends ConsumerWidget {
         );
     final scheme = Theme.of(context).colorScheme;
     final isGuest = authUser?.isAnonymous ?? true;
-    final displayName = isGuest
-        ? 'Guest Athlete'
-        : (authUser?.displayName ??
-            firestoreProfile?.displayName ??
-            stats.name);
+    final displayName = firestoreProfile?.effectiveDisplayName ??
+        (isGuest
+            ? 'Guest Athlete'
+            : (authUser?.displayName ?? stats.name));
     final joinDate = firestoreProfile?.createdAt.toDate() ?? stats.joinDate;
     final join = _formatJoin(joinDate);
 
@@ -43,6 +51,7 @@ class ProfileScreen extends ConsumerWidget {
                 radius: 44,
                 fontSize: 28,
                 photoUrl: firestoreProfile?.photoUrl,
+                avatarColorHex: firestoreProfile?.avatarColor,
                 initials: firestoreProfile?.initials ??
                     (isGuest ? 'G' : stats.initials),
               ),
@@ -88,6 +97,35 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           _SettingsCard(
             children: [
+              // ── Guest-only: Link Google Account ──────────────────────────
+              if (isGuest) ...[  
+                _SettingsTile(
+                  icon: Icons.link_rounded,
+                  title: 'Link Google Account',
+                  subtitle: 'Save your progress permanently',
+                  loading: _linking,
+                  onTap: _linking ? () {} : () => _handleLink(context, ref),
+                ),
+                Divider(
+                  height: 1,
+                  color: scheme.outline.withValues(alpha: 0.5),
+                ),
+              ],
+              // ─────────────────────────────────────────────────────────────
+              _SettingsTile(
+                icon: Icons.badge_outlined,
+                title: 'Edit Display Name',
+                subtitle: displayName,
+                onTap: _editDisplayName,
+              ),
+              Divider(height: 1, color: scheme.outline.withValues(alpha: 0.5)),
+              _SettingsTile(
+                icon: Icons.palette_outlined,
+                title: 'Avatar Color',
+                subtitle: 'Used when you have no profile photo',
+                onTap: _editAvatarColor,
+              ),
+              Divider(height: 1, color: scheme.outline.withValues(alpha: 0.5)),
               _SettingsTile(
                 icon: Icons.notifications_outlined,
                 title: 'Notifications',
@@ -140,6 +178,89 @@ class ProfileScreen extends ConsumerWidget {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  Future<void> _editDisplayName() async {
+    final uid = ref.read(authProvider)?.uid;
+    if (uid == null) return;
+
+    final initial = ref.read(userProfileProvider).maybeWhen(
+          data: (profile) => profile?.effectiveDisplayName ?? '',
+          orElse: () => '',
+        );
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _EditDisplayNameDialog(
+        uid: uid,
+        initialName: initial,
+      ),
+    );
+  }
+
+  Future<void> _editAvatarColor() async {
+    final uid = ref.read(authProvider)?.uid;
+    if (uid == null) return;
+
+    final currentHex = ref.read(userProfileProvider).maybeWhen(
+          data: (profile) => profile?.avatarColor,
+          orElse: () => null,
+        );
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _AvatarColorDialog(
+        uid: uid,
+        currentHex: currentHex,
+      ),
+    );
+  }
+
+  Future<void> _handleLink(BuildContext context, WidgetRef ref) async {
+    // Capture messenger before the async gap to satisfy
+    // use_build_context_synchronously.
+    final sm = ScaffoldMessenger.of(context);
+    setState(() => _linking = true);
+    try {
+      final result =
+          await ref.read(authProvider.notifier).linkGoogleAccount();
+      if (!mounted) return;
+      switch (result) {
+        case LinkSuccess():
+          sm.showSnackBar(
+            const SnackBar(
+              content: Text(
+                '🎉 Google account linked! Your progress is now saved permanently.',
+              ),
+            ),
+          );
+        case LinkAlreadyInUse():
+          sm.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This Google account is already linked to another profile. '
+                'Sign in with Google instead to access that account '
+                '(your current guest data will not be merged).',
+              ),
+              duration: Duration(seconds: 6),
+            ),
+          );
+        case LinkCancelled():
+          // User dismissed — nothing to show.
+          break;
+      }
+    } catch (_) {
+      if (!mounted) return;
+      sm.showSnackBar(
+        const SnackBar(
+          content: Text('Something went wrong. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _linking = false);
+    }
+  }
+
   void _showAbout(BuildContext context) {
     showDialog<void>(
       context: context,
@@ -155,6 +276,150 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EditDisplayNameDialog extends StatefulWidget {
+  const _EditDisplayNameDialog({
+    required this.uid,
+    required this.initialName,
+  });
+
+  final String uid;
+  final String initialName;
+
+  @override
+  State<_EditDisplayNameDialog> createState() => _EditDisplayNameDialogState();
+}
+
+class _EditDisplayNameDialogState extends State<_EditDisplayNameDialog> {
+  late final TextEditingController _controller;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
+    final trimmed = _controller.text.trim();
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.uid).update({
+        'customDisplayName': trimmed.isEmpty ? FieldValue.delete() : trimmed,
+      });
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Couldn’t save display name')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Display Name'),
+      content: TextField(
+        controller: _controller,
+        enabled: !_saving,
+        autofocus: true,
+        maxLength: 30,
+        textCapitalization: TextCapitalization.words,
+        decoration: const InputDecoration(
+          hintText: 'Leave empty to use your Google name',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AvatarColorDialog extends StatefulWidget {
+  const _AvatarColorDialog({
+    required this.uid,
+    required this.currentHex,
+  });
+
+  final String uid;
+  final String? currentHex;
+
+  @override
+  State<_AvatarColorDialog> createState() => _AvatarColorDialogState();
+}
+
+class _AvatarColorDialogState extends State<_AvatarColorDialog> {
+  bool _saving = false;
+
+  Future<void> _select(String hex) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.uid).update({
+        'avatarColor': hex,
+      });
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Couldn’t save avatar color')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Avatar Color'),
+      content: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          for (final color in AppColors.avatarSwatches)
+            _ColorSwatch(
+              color: color,
+              selected: AppColors.toHex(color) ==
+                  widget.currentHex?.toUpperCase(),
+              onTap: _saving ? () {} : () => _select(AppColors.toHex(color)),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+      ],
     );
   }
 }
@@ -187,6 +452,7 @@ class _SettingsTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.destructive = false,
+    this.loading = false,
   });
 
   final IconData icon;
@@ -194,6 +460,9 @@ class _SettingsTile extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final bool destructive;
+
+  /// When `true`, replaces the trailing chevron with a small loading spinner.
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -205,11 +474,57 @@ class _SettingsTile extends StatelessWidget {
       leading: Icon(icon, color: color),
       title: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle),
-      trailing: Icon(
-        Icons.chevron_right_rounded,
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
-      ),
+      trailing: loading
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: color),
+            )
+          : Icon(
+              Icons.chevron_right_rounded,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+            ),
       onTap: onTap,
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? Colors.white : Colors.transparent,
+            width: 3,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.5),
+                    blurRadius: 6,
+                  ),
+                ]
+              : null,
+        ),
+      ),
     );
   }
 }

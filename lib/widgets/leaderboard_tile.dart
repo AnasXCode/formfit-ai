@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/leaderboard_entry.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'user_avatar.dart';
 
 class LeaderboardTile extends StatelessWidget {
   const LeaderboardTile({super.key, required this.entry});
@@ -57,18 +58,11 @@ class LeaderboardTile extends StatelessWidget {
                   ),
           ),
           const SizedBox(width: 8),
-          CircleAvatar(
+          UserAvatar(
             radius: 20,
-            backgroundColor: highlight
-                ? scheme.primary.withValues(alpha: 0.22)
-                : scheme.surfaceContainerHighest,
-            child: Text(
-              entry.initials,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: scheme.onSurface,
-              ),
-            ),
+            fontSize: 13,
+            initials: entry.initials,
+            avatarColorHex: entry.avatarColor,
           ),
           const SizedBox(width: 12),
           Expanded(

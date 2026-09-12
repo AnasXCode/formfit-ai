@@ -23,4 +23,37 @@ abstract final class AppColors {
   static const Color lightBorder = Color(0xFFE3E7EE);
   static const Color lightText = Color(0xFF12151A);
   static const Color lightMuted = Color(0xFF6B7380);
+  static const Color avatarBlue = Color(0xFF4C8DFF);
+  static const Color avatarPurple = Color(0xFF9B6DFF);
+  static const Color avatarTeal = Color(0xFF2EC4B6);
+
+  static const List<Color> avatarSwatches = [
+    accent,
+    accentSoft,
+    success,
+    warning,
+    gold,
+    bronze,
+    avatarBlue,
+    avatarPurple,
+  ];
+
+  /// Parses `#RRGGBB` (optional leading `#`). Returns null if invalid.
+  static Color? tryParseHex(String? hex) {
+    if (hex == null) return null;
+    var value = hex.trim();
+    if (value.startsWith('#')) value = value.substring(1);
+    if (value.length != 6) return null;
+    final n = int.tryParse(value, radix: 16);
+    if (n == null) return null;
+    return Color(0xFF000000 | n);
+  }
+
+  static String toHex(Color color) {
+    int channel(double component) => (component * 255).round().clamp(0, 255);
+    final r = channel(color.r).toRadixString(16).padLeft(2, '0');
+    final g = channel(color.g).toRadixString(16).padLeft(2, '0');
+    final b = channel(color.b).toRadixString(16).padLeft(2, '0');
+    return '#$r$g$b'.toUpperCase();
+  }
 }

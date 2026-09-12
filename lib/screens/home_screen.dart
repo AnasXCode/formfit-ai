@@ -26,11 +26,11 @@ class HomeScreen extends ConsumerWidget {
         );
     final exercises = ref.watch(exercisesProvider);
     final isGuest = authUser?.isAnonymous ?? true;
-    final name = isGuest
-        ? 'Guest'
-        : (authUser?.displayName?.split(' ').first ??
-            firestoreProfile?.displayName.split(' ').first ??
-            stats.name.split(' ').first);
+    final fullName = firestoreProfile?.effectiveDisplayName ??
+        (isGuest
+            ? 'Guest Athlete'
+            : (authUser?.displayName ?? stats.name));
+    final name = fullName.split(RegExp(r'\s+')).first;
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good morning'
@@ -48,6 +48,7 @@ class HomeScreen extends ConsumerWidget {
                 UserAvatar(
                   radius: 26,
                   photoUrl: firestoreProfile?.photoUrl,
+                  avatarColorHex: firestoreProfile?.avatarColor,
                   initials: firestoreProfile?.initials ??
                       (isGuest ? 'G' : stats.initials),
                 ),
