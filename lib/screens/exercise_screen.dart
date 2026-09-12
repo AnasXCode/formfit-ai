@@ -8,8 +8,9 @@ import '../models/workout_session.dart';
 import '../providers/workout_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import '../widgets/exercise_camera_view.dart';
 
-/// Placeholder session UI. Camera + pose detection can replace [_CameraPlaceholder].
+/// Live camera preview with dummy timer/rep overlay (pose detection comes later).
 class ExerciseScreen extends ConsumerStatefulWidget {
   const ExerciseScreen({super.key, required this.exerciseId});
 
@@ -73,7 +74,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          const Positioned.fill(child: _CameraPlaceholder()),
+          const Positioned.fill(child: ExerciseCameraView()),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -122,48 +123,6 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CameraPlaceholder extends StatelessWidget {
-  const _CameraPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF1A1D22),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white24),
-            ),
-            child: const Icon(
-              Icons.photo_camera_outlined,
-              size: 40,
-              color: Colors.white54,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Camera preview',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white70,
-                ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Drop in camera + pose detection here',
-            style: TextStyle(color: Colors.white38, fontSize: 13),
           ),
         ],
       ),
