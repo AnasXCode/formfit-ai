@@ -6,7 +6,7 @@ class ActiveWorkout {
   const ActiveWorkout({
     this.reps = 0,
     this.elapsed = Duration.zero,
-    this.formStatus = 'Good form',
+    this.formStatus = 'Get into push-up position',
     this.formOk = true,
   });
 
@@ -44,11 +44,12 @@ class ActiveWorkoutNotifier extends Notifier<ActiveWorkout> {
     state = state.copyWith(reps: state.reps + 1);
   }
 
-  void setForm({required bool ok}) {
-    state = state.copyWith(
-      formOk: ok,
-      formStatus: ok ? 'Good form' : 'Check elbows',
-    );
+  /// Called for every camera frame, so it only updates state when something
+  /// actually changed (avoids rebuilding the screen 15 times per second).
+  void setForm({required bool ok, String? message}) {
+    final status = message ?? (ok ? 'Good form' : 'Check your form');
+    if (state.formOk == ok && state.formStatus == status) return;
+    state = state.copyWith(formOk: ok, formStatus: status);
   }
 
   void reset() {
@@ -57,7 +58,7 @@ class ActiveWorkoutNotifier extends Notifier<ActiveWorkout> {
 }
 
 final activeWorkoutProvider =
-    NotifierProvider<ActiveWorkoutNotifier, ActiveWorkout>(
+NotifierProvider<ActiveWorkoutNotifier, ActiveWorkout>(
   ActiveWorkoutNotifier.new,
 );
 

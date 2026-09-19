@@ -1,16 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../models/workout_session.dart';
+import '../pose/push_up_counter.dart';
 import '../providers/workout_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/exercise_camera_view.dart';
 
-/// Live camera preview with dummy timer/rep overlay (pose detection comes later).
+/// Live camera preview with real pose detection, form feedback and rep counting.
 class ExerciseScreen extends ConsumerStatefulWidget {
   const ExerciseScreen({super.key, required this.exerciseId});
 
@@ -22,11 +25,14 @@ class ExerciseScreen extends ConsumerStatefulWidget {
 
 class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
   Timer? _clock;
-  Timer? _demo;
+  final PushUpCounter _counter = PushUpCounter();
 
   @override
   void initState() {
     super.initState();
+    // The camera preview / skeleton mapping assumes portrait.
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
     Future.microtask(() {
       if (mounted) ref.read(activeWorkoutProvider.notifier).reset();
     });
@@ -34,31 +40,33 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       if (!mounted) return;
       ref.read(activeWorkoutProvider.notifier).tick();
     });
-    // Dummy activity so the overlay feels alive before real pose logic.
-    _demo = Timer.periodic(const Duration(seconds: 2), (t) {
-      final n = ref.read(activeWorkoutProvider.notifier);
-      n.addRep();
-      n.setForm(ok: t.tick % 4 != 0);
-    });
   }
 
   @override
   void dispose() {
     _clock?.cancel();
-    _demo?.cancel();
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
+  }
+
+  /// Called by the camera view for every processed frame.
+  void _onPose(Pose? pose) {
+    if (!mounted) return;
+    final update = _counter.update(pose);
+    final notifier = ref.read(activeWorkoutProvider.notifier);
+    if (update.repCounted) notifier.addRep();
+    notifier.setForm(ok: update.formOk, message: update.message);
   }
 
   void _endSession() {
     final live = ref.read(activeWorkoutProvider);
-    final accuracy = live.reps == 0 ? 0.0 : 87.0 + (live.reps % 8);
     ref.read(lastSessionProvider.notifier).state = WorkoutSession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       exerciseId: widget.exerciseId,
       exerciseName: 'Push-Ups',
       reps: live.reps,
       duration: live.elapsed,
-      formAccuracy: accuracy.clamp(70, 99).toDouble(),
+      formAccuracy: _counter.accuracy,
       completedAt: DateTime.now(),
     );
     context.go('/summary');
@@ -74,7 +82,13 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          const Positioned.fill(child: ExerciseCameraView()),
+          Positioned.fill(
+            child: ExerciseCameraView(
+              onPose: _onPose,
+              skeletonColor:
+              live.formOk ? AppColors.success : AppColors.warning,
+            ),
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -86,27 +100,35 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                         icon: Icons.timer_outlined,
                         label: '$m:$s',
                       ),
-                      const Spacer(),
-                      _FormBadge(ok: live.formOk, label: live.formStatus),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _FormBadge(
+                            ok: live.formOk,
+                            label: live.formStatus,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const Spacer(),
                   Text(
                     '${live.reps}',
                     style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                          color: Colors.white,
-                          fontSize: 92,
-                          shadows: const [
-                            Shadow(blurRadius: 18, color: Colors.black54),
-                          ],
-                        ),
+                      color: Colors.white,
+                      fontSize: 92,
+                      shadows: const [
+                        Shadow(blurRadius: 18, color: Colors.black54),
+                      ],
+                    ),
                   ),
                   Text(
                     'REPS',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white70,
-                          letterSpacing: 4,
-                        ),
+                      color: Colors.white70,
+                      letterSpacing: 4,
+                    ),
                   ),
                   const Spacer(),
                   SizedBox(
@@ -175,11 +197,12 @@ class _FormBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
+        color: Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.7)),
+        border: Border.all(color: color.withValues(alpha: 0.8)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             ok ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
@@ -187,9 +210,13 @@ class _FormBadge extends StatelessWidget {
             color: color,
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: color, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

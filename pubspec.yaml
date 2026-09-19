@@ -43,6 +43,7 @@ dependencies:
   camera: ^0.12.1
   # Used only to open OS app settings after camera permission is denied.
   permission_handler: ^13.0.1
+  google_mlkit_pose_detection: ^0.16.1
 
 dev_dependencies:
   flutter_test:
