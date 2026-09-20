@@ -69,6 +69,18 @@ class PushUpCounter {
   static const int _badFormFramesToWarn = 4; // avoid flicker
   static const Duration _messageHold = Duration(milliseconds: 1600);
 
+  // ---- FRONT-VIEW mode (phone in front of the user, facing them) ---------
+  // In front view we cannot measure the elbow angle or body line reliably, so
+  // we use a distance ratio instead: (shoulder -> wrist distance) / (shoulder
+  // width). It is big with straight arms and shrinks as the chest goes down.
+  // All values are RELATIVE to this user's own "arms straight" reading.
+  static const double _frontViewRatio = 0.45; // shoulderWidth / armLength
+  static const double _frontMinTop = 1.1; // min ratio to accept "arms straight"
+  static const double _frontDownEnter = 0.75; // rep starts below 75% of top
+  static const double _frontDepth = 0.48; // must reach 48% of top
+  static const double _frontUpExit = 0.88; // rep ends above 88% of top
+  static const double _frontMaxWristMove = 0.8; // hands must stay put
+
   /// Live numbers shown on screen while tuning (remove the widget later).
   final ValueNotifier<String> debug = ValueNotifier<String>('waiting...');
 
@@ -90,6 +102,17 @@ class PushUpCounter {
   int _outOfPositionFrames = 0;
   int _deepFrames = 0;
   bool _reachedDepth = false;
+  // front-view state
+  bool _inFront = false;
+  int _frontVotes = 0;
+  double? _frontG;
+  double? _frontTop;
+  int _frontStable = 0;
+  int _frontDeepFrames = 0;
+  bool _frontReachedDepth = false;
+  double _frontWristRefX = 0;
+  double _frontWristRefY = 0;
+  double _frontMaxWristDev = 0;
   String? _heldMessage;
   DateTime _heldUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -98,10 +121,28 @@ class PushUpCounter {
     rejectedReps = 0;
     _outOfPositionFrames = 0;
     _abandonRep();
+    _resetFront();
+    _frontVotes = 0;
+    _inFront = false;
     _heldMessage = null;
   }
 
   PushUpUpdate update(Pose? pose) {
+    // Decide between FRONT view and SIDE view. Shoulders far apart compared to
+    // the arm length means the camera is looking at us from the front.
+    final front = pose == null ? null : _FrontView.from(pose);
+    if (front != null) {
+      final vote = front.shoulderWidth / front.armLength > _frontViewRatio ? 1 : -1;
+      _frontVotes = math.max(-10, math.min(10, _frontVotes + vote));
+    }
+    final wantFront = _inFront ? _frontVotes > -5 : _frontVotes >= 5;
+    if (wantFront != _inFront) {
+      _inFront = wantFront;
+      _abandonRep();
+      _resetFront();
+    }
+    if (_inFront && front != null) return _updateFront(front);
+
     final side = pose == null ? null : _Side.pick(pose);
     if (side == null) {
       debug.value = pose == null
@@ -226,6 +267,127 @@ class PushUpCounter {
           ),
         );
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // FRONT view
+  // ---------------------------------------------------------------------
+
+  void _resetFront() {
+    _frontG = null;
+    _frontTop = null;
+    _frontStable = 0;
+    _frontDeepFrames = 0;
+    _frontReachedDepth = false;
+    _frontMaxWristDev = 0;
+  }
+
+  PushUpUpdate _updateFront(_FrontView f) {
+    final previous = _frontG;
+    final g = _ema(previous, f.armRatio);
+    _frontG = g;
+
+    void log() {
+      final top = _frontTop;
+      debug.value =
+      'FRONT view  ratio ${g.toStringAsFixed(2)}  top ${top == null ? '-' : top.toStringAsFixed(2)}\n'
+          '${_phase.name}  reps $reps  bad $rejectedReps';
+    }
+
+    switch (_phase) {
+      case PushUpPhase.notReady:
+      // Calibrate: wait until the user holds still with arms straight.
+        final steady = previous != null && (g - previous).abs() < 0.03 * g;
+        _frontStable = (steady && g >= _frontMinTop) ? _frontStable + 1 : 0;
+        if (_frontStable >= 10) {
+          _frontTop = g;
+          _phase = PushUpPhase.up;
+          _frontStable = 0;
+          log();
+          return _withHold(
+            PushUpUpdate(phase: _phase, formOk: true, message: 'Ready — go down'),
+          );
+        }
+        log();
+        return _withHold(
+          const PushUpUpdate(
+            phase: PushUpPhase.notReady,
+            formOk: true,
+            message: 'Hold still with arms straight to start',
+          ),
+        );
+
+      case PushUpPhase.up:
+        final topUp = _frontTop ?? g;
+        if (g > topUp) _frontTop = topUp + 0.1 * (g - topUp); // slowly adapt upward
+        if (g <= topUp * _frontDownEnter) {
+          _phase = PushUpPhase.down;
+          _frontDeepFrames = 0;
+          _frontReachedDepth = false;
+          _frontWristRefX = f.wristMidX;
+          _frontWristRefY = f.wristMidY;
+          _frontMaxWristDev = 0;
+          log();
+          return _withHold(
+            PushUpUpdate(phase: _phase, formOk: true, message: 'Go lower'),
+          );
+        }
+        log();
+        return _withHold(
+          PushUpUpdate(phase: _phase, formOk: true, message: 'Good — go down'),
+        );
+
+      case PushUpPhase.down:
+        final topDown = _frontTop ?? g;
+        final dx = f.wristMidX - _frontWristRefX;
+        final dy = f.wristMidY - _frontWristRefY;
+        final dev = math.sqrt(dx * dx + dy * dy) / f.shoulderWidth;
+        _frontMaxWristDev = math.max(_frontMaxWristDev, dev);
+
+        if (g <= topDown * _frontDepth) {
+          _frontDeepFrames++;
+          if (_frontDeepFrames >= _depthFramesRequired) _frontReachedDepth = true;
+        } else {
+          _frontDeepFrames = 0;
+        }
+
+        log();
+        if (g >= topDown * _frontUpExit) return _finishFrontRep();
+        return _withHold(
+          PushUpUpdate(
+            phase: _phase,
+            formOk: true,
+            message: _frontReachedDepth ? 'Push up!' : 'Go lower',
+          ),
+        );
+    }
+  }
+
+  PushUpUpdate _finishFrontRep() {
+    _phase = PushUpPhase.up;
+    final handsOk = _frontMaxWristDev <= _frontMaxWristMove;
+    if (_frontReachedDepth && handsOk) {
+      reps++;
+      _heldMessage = null;
+      return PushUpUpdate(
+        phase: _phase,
+        formOk: true,
+        message: 'Good rep!',
+        repCounted: true,
+      );
+    }
+    rejectedReps++;
+    final msg = !_frontReachedDepth
+        ? 'Go lower — rep not counted'
+        : 'Keep your hands on the floor — rep not counted';
+    _heldMessage = msg;
+    _heldUntil = DateTime.now().add(_messageHold);
+    return PushUpUpdate(
+      phase: _phase,
+      formOk: false,
+      message: msg,
+      repRejected: true,
+    );
   }
 
   PushUpUpdate _finishRep() {
@@ -383,5 +545,61 @@ class _Side {
     if (a == null) return b;
     if (b == null) return a;
     return a.score >= b.score ? a : b;
+  }
+}
+
+/// Both shoulders and both wrists, as seen when the camera faces the user.
+class _FrontView {
+  const _FrontView({
+    required this.leftShoulder,
+    required this.rightShoulder,
+    required this.leftWrist,
+    required this.rightWrist,
+  });
+
+  final PoseLandmark leftShoulder;
+  final PoseLandmark rightShoulder;
+  final PoseLandmark leftWrist;
+  final PoseLandmark rightWrist;
+
+  static double _dist(PoseLandmark a, PoseLandmark b) {
+    final dx = a.x - b.x;
+    final dy = a.y - b.y;
+    return math.sqrt(dx * dx + dy * dy);
+  }
+
+  double get shoulderWidth => _dist(leftShoulder, rightShoulder);
+
+  /// Average shoulder -> wrist distance of both arms.
+  double get armLength =>
+      (_dist(leftShoulder, leftWrist) + _dist(rightShoulder, rightWrist)) / 2;
+
+  /// armLength / shoulderWidth: large with straight arms, small at the bottom.
+  double get armRatio => armLength / shoulderWidth;
+
+  double get wristMidX => (leftWrist.x + rightWrist.x) / 2;
+  double get wristMidY => (leftWrist.y + rightWrist.y) / 2;
+
+  static _FrontView? from(Pose pose) {
+    final l = pose.landmarks;
+    final ls = l[PoseLandmarkType.leftShoulder];
+    final rs = l[PoseLandmarkType.rightShoulder];
+    final lw = l[PoseLandmarkType.leftWrist];
+    final rw = l[PoseLandmarkType.rightWrist];
+    if (ls == null || rs == null || lw == null || rw == null) return null;
+    if (ls.likelihood < _minLikelihood ||
+        rs.likelihood < _minLikelihood ||
+        lw.likelihood < _minLikelihood ||
+        rw.likelihood < _minLikelihood) {
+      return null;
+    }
+    final view = _FrontView(
+      leftShoulder: ls,
+      rightShoulder: rs,
+      leftWrist: lw,
+      rightWrist: rw,
+    );
+    if (view.shoulderWidth < 1e-3 || view.armLength < 1e-3) return null;
+    return view;
   }
 }
