@@ -1,9 +1,10 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 /// Minimum ML Kit confidence for a landmark to be trusted.
-const double _minLikelihood = 0.5;
+const double _minLikelihood = 0.3;
 
 enum PushUpPhase { notReady, up, down }
 
@@ -43,14 +44,31 @@ class PushUpUpdate {
 ///  3. the body stayed in one straight line (shoulder-hip-ankle angle
 ///     >= [_straightBodyAngle]) during the whole rep.
 class PushUpCounter {
-  // ---- Tunable thresholds (degrees) -------------------------------------
-  static const double _upAngle = 150; // arms straight
-  static const double _downEnterAngle = 110; // rep "starts" below this
-  static const double _validDepthAngle = 95; // must go at least this deep
-  static const double _straightBodyAngle = 155; // shoulder-hip-ankle
-  static const double _maxTiltDeg = 40; // body must be roughly horizontal
+  // ---- Thresholds (degrees) ---------------------------------------------
+  // Textbook push-up angles vs. what we use (camera + ML Kit are noisy, so
+  // the app accepts a small tolerance around the ideal values):
+  //
+  //   Elbow, top (arms locked)  ideal 170-180   -> we accept  >= 150
+  //   Elbow, bottom (chest low) ideal ~90       -> we accept  <= 100
+  //   Rep "starts" going down   -                -> below 120
+  //   Body line shoulder-hip-ankle ideal 170-180 -> we accept >= 150
+  //
+  static const double _upAngle = 150; // arms (almost) straight
+  static const double _downEnterAngle = 120; // rep "starts" below this
+  static const double _validDepthAngle = 100; // must go at least this deep
+  static const double _straightBodyAngle = 150; // shoulder-hip-ankle
+  // "In push-up position" check. It does NOT depend on which way the phone is
+  // rotated: in a push-up the arm is ~perpendicular to the body line
+  // (shoulder->foot). Standing with arms hanging gives ~0-20 degrees, so it is
+  // rejected.
+  static const double _minArmTorsoAngle = 45;
+  static const double _maxArmTorsoAngle = 150;
+  static const int _outOfPositionFramesToReset = 8; // ~0.5 s of bad frames
   static const int _badFormFramesToWarn = 4; // avoid flicker
   static const Duration _messageHold = Duration(milliseconds: 1600);
+
+  /// Live numbers shown on screen while tuning (remove the widget later).
+  final ValueNotifier<String> debug = ValueNotifier<String>('waiting...');
 
   int reps = 0;
   int rejectedReps = 0;
@@ -67,12 +85,14 @@ class PushUpCounter {
   double _repMinElbow = 180;
   double _repMinBody = 180;
   int _badFormFrames = 0;
+  int _outOfPositionFrames = 0;
   String? _heldMessage;
   DateTime _heldUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
   void reset() {
     reps = 0;
     rejectedReps = 0;
+    _outOfPositionFrames = 0;
     _abandonRep();
     _heldMessage = null;
   }
@@ -80,6 +100,9 @@ class PushUpCounter {
   PushUpUpdate update(Pose? pose) {
     final side = pose == null ? null : _Side.pick(pose);
     if (side == null) {
+      debug.value = pose == null
+          ? 'NO POSE: person not detected'
+          : 'NO SIDE (need > $_minLikelihood)\n${_Side.describe(pose)}';
       _abandonRep();
       return _withHold(
         PushUpUpdate(
@@ -97,19 +120,33 @@ class PushUpCounter {
     final elbow = _elbow!;
     final body = _body!;
 
-    // Body should be roughly horizontal in the image (side view).
-    final dx = (side.foot.x - side.shoulder.x).abs();
-    final dy = (side.foot.y - side.shoulder.y).abs();
-    final tilt = math.atan2(dy, dx) * 180 / math.pi; // 0 = horizontal
-    if (tilt > _maxTiltDeg) {
-      _abandonRep();
-      return _withHold(
-        const PushUpUpdate(
-          phase: PushUpPhase.notReady,
-          formOk: true,
-          message: 'Get into push-up position (side view)',
-        ),
-      );
+    // Are we in push-up position? Arm ~perpendicular to the body line.
+    final armToTorso = _angle(side.foot, side.shoulder, side.wrist);
+    final inPosition =
+        armToTorso >= _minArmTorsoAngle && armToTorso <= _maxArmTorsoAngle;
+
+    debug.value =
+    'elbow ${elbow.round()}  body ${body.round()}  arm-torso ${armToTorso.round()} '
+        '(need $_minArmTorsoAngle-$_maxArmTorsoAngle)\n'
+        '${_phase.name}  min elbow ${_repMinElbow.round()}  reps $reps  bad $rejectedReps';
+
+    if (inPosition) {
+      _outOfPositionFrames = 0;
+    } else {
+      _outOfPositionFrames++;
+      // Not started yet -> tell the user right away. Mid-rep -> ignore a few
+      // noisy frames before giving up on the rep.
+      if (_phase == PushUpPhase.notReady ||
+          _outOfPositionFrames >= _outOfPositionFramesToReset) {
+        _abandonRep();
+        return _withHold(
+          const PushUpUpdate(
+            phase: PushUpPhase.notReady,
+            formOk: true,
+            message: 'Get into push-up position (side view)',
+          ),
+        );
+      }
     }
 
     final bodyBad = body < _straightBodyAngle;
@@ -303,6 +340,23 @@ class _Side {
       foot: foot,
       score: score,
     );
+  }
+
+  /// Landmark confidences, for the on-screen debug text.
+  static String describe(Pose pose) {
+    String v(PoseLandmarkType t) =>
+        (pose.landmarks[t]?.likelihood ?? 0).toStringAsFixed(1);
+    String row(
+        String tag,
+        PoseLandmarkType sh,
+        PoseLandmarkType el,
+        PoseLandmarkType wr,
+        PoseLandmarkType hp,
+        PoseLandmarkType an,
+        ) =>
+        '$tag sh ${v(sh)} el ${v(el)} wr ${v(wr)} hp ${v(hp)} an ${v(an)}';
+    return '${row('L', PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist, PoseLandmarkType.leftHip, PoseLandmarkType.leftAnkle)}\n'
+        '${row('R', PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist, PoseLandmarkType.rightHip, PoseLandmarkType.rightAnkle)}';
   }
 
   static _Side? pick(Pose pose) {
