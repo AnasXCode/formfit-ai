@@ -48,15 +48,17 @@ class PushUpCounter {
   // Textbook push-up angles vs. what we use (camera + ML Kit are noisy, so
   // the app accepts a small tolerance around the ideal values):
   //
-  //   Elbow, top (arms locked)  ideal 170-180   -> we accept  >= 150
-  //   Elbow, bottom (chest low) ideal ~90       -> we accept  <= 100
-  //   Rep "starts" going down   -                -> below 120
-  //   Body line shoulder-hip-ankle ideal 170-180 -> we accept >= 150
+  //   Elbow, top (arms locked)     ideal 170-180 -> we accept >= 150
+  //   Elbow, bottom (chest low)    ideal ~90     -> we require <= 90
+  //   Rep "starts" going down      -              -> below 120
+  //   Body line shoulder-hip-ankle ideal 170-180 -> we require >= 160
   //
   static const double _upAngle = 150; // arms (almost) straight
   static const double _downEnterAngle = 120; // rep "starts" below this
-  static const double _validDepthAngle = 100; // must go at least this deep
-  static const double _straightBodyAngle = 150; // shoulder-hip-ankle
+  static const double _validDepthAngle = 90; // must go at least this deep
+  static const int _depthFramesRequired = 2; // ...for this many frames in a row
+  static const double _straightBodyAngle = 160; // shoulder-hip-ankle
+
   // "In push-up position" check. It does NOT depend on which way the phone is
   // rotated: in a push-up the arm is ~perpendicular to the body line
   // (shoulder->foot). Standing with arms hanging gives ~0-20 degrees, so it is
@@ -86,6 +88,8 @@ class PushUpCounter {
   double _repMinBody = 180;
   int _badFormFrames = 0;
   int _outOfPositionFrames = 0;
+  int _deepFrames = 0;
+  bool _reachedDepth = false;
   String? _heldMessage;
   DateTime _heldUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -179,6 +183,8 @@ class PushUpCounter {
           _phase = PushUpPhase.down;
           _repMinElbow = elbow;
           _repMinBody = body;
+          _deepFrames = 0;
+          _reachedDepth = false;
           return _withHold(
             PushUpUpdate(
               phase: _phase,
@@ -198,8 +204,18 @@ class PushUpCounter {
       case PushUpPhase.down:
         _repMinElbow = math.min(_repMinElbow, elbow);
         _repMinBody = math.min(_repMinBody, body);
+
+        // Depth counts only if the elbow stays deep for a few frames in a row
+        // (ignores single noisy frames).
+        if (elbow <= _validDepthAngle) {
+          _deepFrames++;
+          if (_deepFrames >= _depthFramesRequired) _reachedDepth = true;
+        } else {
+          _deepFrames = 0;
+        }
+
         if (elbow >= _upAngle) return _finishRep();
-        final deepEnough = _repMinElbow <= _validDepthAngle;
+        final deepEnough = _reachedDepth;
         return _withHold(
           PushUpUpdate(
             phase: _phase,
@@ -214,7 +230,7 @@ class PushUpCounter {
 
   PushUpUpdate _finishRep() {
     _phase = PushUpPhase.up;
-    final deepEnough = _repMinElbow <= _validDepthAngle;
+    final deepEnough = _reachedDepth;
     final straight = _repMinBody >= _straightBodyAngle;
 
     if (deepEnough && straight) {
@@ -258,6 +274,8 @@ class PushUpCounter {
     _badFormFrames = 0;
     _repMinElbow = 180;
     _repMinBody = 180;
+    _deepFrames = 0;
+    _reachedDepth = false;
   }
 
   /// True when the hip is below the shoulder→foot line (image y grows down).
