@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/dummy_data.dart';
+import '../providers/theme_provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -27,11 +28,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final stats = ref.watch(currentUserProvider);
     final authUser = ref.watch(authProvider);
     final firestoreProfile = ref.watch(userProfileProvider).when(
-          data: (UserProfile? value) => value,
-          loading: () => null,
-          error: (Object _, StackTrace _) => null,
-        );
+      data: (UserProfile? value) => value,
+      loading: () => null,
+      error: (Object _, StackTrace _) => null,
+    );
     final scheme = Theme.of(context).colorScheme;
+    final themeMode = ref.watch(themeModeProvider);
     final isGuest = authUser?.isAnonymous ?? true;
     final displayName = firestoreProfile?.effectiveDisplayName ??
         (isGuest
@@ -98,7 +100,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _SettingsCard(
             children: [
               // ── Guest-only: Link Google Account ──────────────────────────
-              if (isGuest) ...[  
+              if (isGuest) ...[
                 _SettingsTile(
                   icon: Icons.link_rounded,
                   title: 'Link Google Account',
@@ -124,6 +126,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: 'Avatar Color',
                 subtitle: 'Used when you have no profile photo',
                 onTap: _editAvatarColor,
+              ),
+              Divider(height: 1, color: scheme.outline.withValues(alpha: 0.5)),
+              _SettingsTile(
+                icon: Icons.brightness_6_outlined,
+                title: 'Appearance',
+                subtitle: _themeLabel(themeMode),
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => const _ThemeModeDialog(),
+                ),
               ),
               Divider(height: 1, color: scheme.outline.withValues(alpha: 0.5)),
               _SettingsTile(
@@ -183,9 +195,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (uid == null) return;
 
     final initial = ref.read(userProfileProvider).maybeWhen(
-          data: (profile) => profile?.effectiveDisplayName ?? '',
-          orElse: () => '',
-        );
+      data: (profile) => profile?.effectiveDisplayName ?? '',
+      orElse: () => '',
+    );
 
     if (!mounted) return;
     await showDialog<void>(
@@ -202,9 +214,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (uid == null) return;
 
     final currentHex = ref.read(userProfileProvider).maybeWhen(
-          data: (profile) => profile?.avatarColor,
-          orElse: () => null,
-        );
+      data: (profile) => profile?.avatarColor,
+      orElse: () => null,
+    );
 
     if (!mounted) return;
     await showDialog<void>(
@@ -223,7 +235,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _linking = true);
     try {
       final result =
-          await ref.read(authProvider.notifier).linkGoogleAccount();
+      await ref.read(authProvider.notifier).linkGoogleAccount();
       if (!mounted) return;
       switch (result) {
         case LinkSuccess():
@@ -239,14 +251,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SnackBar(
               content: Text(
                 'This Google account is already linked to another profile. '
-                'Sign in with Google instead to access that account '
-                '(your current guest data will not be merged).',
+                    'Sign in with Google instead to access that account '
+                    '(your current guest data will not be merged).',
               ),
               duration: Duration(seconds: 6),
             ),
           );
         case LinkCancelled():
-          // User dismissed — nothing to show.
+        // User dismissed — nothing to show.
           break;
       }
     } catch (_) {
@@ -352,10 +364,10 @@ class _EditDisplayNameDialogState extends State<_EditDisplayNameDialog> {
           onPressed: _saving ? null : _save,
           child: _saving
               ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
               : const Text('Save'),
         ),
       ],
@@ -476,14 +488,14 @@ class _SettingsTile extends StatelessWidget {
       subtitle: Text(subtitle),
       trailing: loading
           ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: color),
-            )
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2, color: color),
+      )
           : Icon(
-              Icons.chevron_right_rounded,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
-            ),
+        Icons.chevron_right_rounded,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+      ),
       onTap: onTap,
     );
   }
@@ -517,14 +529,110 @@ class _ColorSwatch extends StatelessWidget {
           ),
           boxShadow: selected
               ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.5),
-                    blurRadius: 6,
-                  ),
-                ]
+            BoxShadow(
+              color: color.withValues(alpha: 0.5),
+              blurRadius: 6,
+            ),
+          ]
               : null,
         ),
       ),
+    );
+  }
+}
+
+String _themeLabel(ThemeMode mode) {
+  switch (mode) {
+    case ThemeMode.light:
+      return 'Light';
+    case ThemeMode.dark:
+      return 'Dark';
+    case ThemeMode.system:
+      return 'System default';
+  }
+}
+
+class _ThemeModeDialog extends ConsumerWidget {
+  const _ThemeModeDialog();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider);
+
+    void choose(ThemeMode mode) {
+      ref.read(themeModeProvider.notifier).setMode(mode);
+      Navigator.pop(context);
+    }
+
+    return AlertDialog(
+      title: const Text('Appearance'),
+      contentPadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ThemeOption(
+            icon: Icons.brightness_auto_rounded,
+            title: 'System default',
+            subtitle: 'Match your phone’s dark / light mode',
+            selected: current == ThemeMode.system,
+            onTap: () => choose(ThemeMode.system),
+          ),
+          _ThemeOption(
+            icon: Icons.light_mode_rounded,
+            title: 'Light',
+            subtitle: 'Always use light mode',
+            selected: current == ThemeMode.light,
+            onTap: () => choose(ThemeMode.light),
+          ),
+          _ThemeOption(
+            icon: Icons.dark_mode_rounded,
+            title: 'Dark',
+            subtitle: 'Always use dark mode',
+            selected: current == ThemeMode.dark,
+            onTap: () => choose(ThemeMode.dark),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  const _ThemeOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: selected ? AppColors.accent : null),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(subtitle),
+      trailing: selected
+          ? const Icon(Icons.check_circle_rounded, color: AppColors.accent)
+          : null,
+      onTap: onTap,
     );
   }
 }
