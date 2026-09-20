@@ -130,26 +130,6 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                       letterSpacing: 4,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  // DEBUG: live angles. Remove once tuning is done.
-                  ValueListenableBuilder<String>(
-                    valueListenable: _counter.debug,
-                    builder: (context, value, child) => Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        value,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
                   const Spacer(),
                   SizedBox(
                     width: double.infinity,

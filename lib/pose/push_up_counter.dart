@@ -87,10 +87,23 @@ class PushUpCounter {
   int reps = 0;
   int rejectedReps = 0;
 
-  /// Percentage of attempted reps that were done with correct form.
+  // Frames seen while the user was in push-up position, and how many of them
+  // had good form. Used for the time-based part of the form score.
+  int _activeFrames = 0;
+  int _goodFrames = 0;
+
+  /// Session form score, 0-100. Average of:
+  ///  * rep score  - correct reps / attempted reps
+  ///  * time score - share of the time in push-up position with good form
+  ///    (hips sagging or piking, bad depth warnings and rejected reps all
+  ///    count against it)
+  /// Returns 0 when no rep was attempted.
   double get accuracy {
-    final total = reps + rejectedReps;
-    return total == 0 ? 0 : reps * 100.0 / total;
+    final attempts = reps + rejectedReps;
+    if (attempts == 0 || _activeFrames == 0) return 0;
+    final repScore = reps * 100.0 / attempts;
+    final timeScore = _goodFrames * 100.0 / _activeFrames;
+    return (repScore + timeScore) / 2;
   }
 
   PushUpPhase _phase = PushUpPhase.notReady;
@@ -119,6 +132,8 @@ class PushUpCounter {
   void reset() {
     reps = 0;
     rejectedReps = 0;
+    _activeFrames = 0;
+    _goodFrames = 0;
     _outOfPositionFrames = 0;
     _abandonRep();
     _resetFront();
@@ -128,6 +143,15 @@ class PushUpCounter {
   }
 
   PushUpUpdate update(Pose? pose) {
+    final result = _compute(pose);
+    if (result.phase != PushUpPhase.notReady) {
+      _activeFrames++;
+      if (result.formOk) _goodFrames++;
+    }
+    return result;
+  }
+
+  PushUpUpdate _compute(Pose? pose) {
     // Decide between FRONT view and SIDE view. Shoulders far apart compared to
     // the arm length means the camera is looking at us from the front.
     final front = pose == null ? null : _FrontView.from(pose);

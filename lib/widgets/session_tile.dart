@@ -55,7 +55,7 @@ class SessionTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               Text(
-                session.durationLabel,
+                '${session.durationLabel} · ${session.formAccuracy.round()}% form',
                 style: Theme.of(context).textTheme.labelSmall,
               ),
             ],
