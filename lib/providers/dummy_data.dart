@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/exercise.dart';
 import '../models/leaderboard_entry.dart';
 import '../models/workout_session.dart';
+import '../widgets/push_up_icon.dart';
 
 /// Placeholder dashboard numbers until workouts are stored in Firestore.
 class DummyUserStats {
@@ -57,6 +58,7 @@ final exercisesProvider = Provider<List<Exercise>>((ref) {
       id: 'pushups',
       name: 'Push-Ups',
       icon: Icons.fitness_center_rounded,
+      iconBuilder: PushUpIcon.builder,
       available: true,
       subtitle: 'AI form tracking ready',
     ),

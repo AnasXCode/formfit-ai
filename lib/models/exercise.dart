@@ -7,6 +7,7 @@ class Exercise {
     required this.icon,
     required this.available,
     this.subtitle,
+    this.iconBuilder,
   });
 
   final String id;
@@ -14,4 +15,8 @@ class Exercise {
   final IconData icon;
   final bool available;
   final String? subtitle;
+
+  /// Optional custom icon (for example a drawn push-up figure). When set it is
+  /// used instead of [icon], which stays as the fallback.
+  final Widget Function(Color color, double size)? iconBuilder;
 }

@@ -18,6 +18,8 @@ class ExerciseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final enabled = exercise.available;
+    final iconColor =
+    enabled ? AppColors.accent : scheme.onSurface.withValues(alpha: 0.5);
 
     return Opacity(
       opacity: enabled ? 1 : 0.55,
@@ -33,12 +35,12 @@ class ExerciseCard extends StatelessWidget {
           ),
           boxShadow: enabled
               ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ]
               : null,
         ),
         child: Row(
@@ -52,10 +54,9 @@ class ExerciseCard extends StatelessWidget {
                     : scheme.outline.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                exercise.icon,
-                color: enabled ? AppColors.accent : scheme.onSurface.withValues(alpha: 0.5),
-              ),
+              child: exercise.iconBuilder != null
+                  ? Center(child: exercise.iconBuilder!(iconColor, 30))
+                  : Icon(exercise.icon, color: iconColor),
             ),
             const SizedBox(width: 14),
             Expanded(
