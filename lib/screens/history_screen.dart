@@ -54,29 +54,86 @@ class HistoryScreen extends ConsumerWidget {
 }
 
 /// One tab: a summary chart on top, then one card per day / week / month.
-class _PeriodTab extends StatelessWidget {
+/// Tapping a bar in the chart scrolls to that period's card and opens it.
+class _PeriodTab extends StatefulWidget {
   const _PeriodTab({required this.view, required this.sessions});
 
   final HistoryView view;
   final List<WorkoutSession> sessions;
 
   @override
+  State<_PeriodTab> createState() => _PeriodTabState();
+}
+
+class _PeriodTabState extends State<_PeriodTab> {
+  final ScrollController _scroll = ScrollController();
+  final Map<DateTime, GlobalKey> _keys = {};
+  final Set<DateTime> _open = {};
+  List<PeriodSummary> _periods = const [];
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _toggle(PeriodSummary p) {
+    setState(() {
+      if (!_open.remove(p.start)) _open.add(p.start);
+    });
+  }
+
+  /// Opens [p]'s card and scrolls it into view (used when a bar is tapped).
+  Future<void> _reveal(PeriodSummary p) async {
+    setState(() => _open.add(p.start));
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    var ctx = _keys[p.start]?.currentContext;
+    if (ctx == null && _scroll.hasClients) {
+      // The card is far down the list and not built yet: jump close to it
+      // first, then align it precisely.
+      final index = _periods.indexWhere((e) => e.start == p.start);
+      final guess = 260.0 + math.max(0, index) * 140.0;
+      _scroll.jumpTo(math.min(guess, _scroll.position.maxScrollExtent));
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      ctx = _keys[p.start]?.currentContext;
+    }
+    if (ctx != null && ctx.mounted) {
+      await Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.05,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final periods = buildPeriods(sessions, view);
+    final view = widget.view;
+    final periods = buildPeriods(widget.sessions, view);
+    _periods = periods;
     // Newest first in the list; the chart reads oldest -> newest.
     final window = periods.take(windowSize(view)).toList().reversed.toList();
 
     return ListView.separated(
+      controller: _scroll,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       itemCount: periods.length + 1,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
-        if (i == 0) return _SummaryChart(view: view, window: window);
+        if (i == 0) {
+          return _SummaryChart(view: view, window: window, onSelect: _reveal);
+        }
         final period = periods[i - 1];
         return _PeriodCard(
-          key: ValueKey('${view.name}-${period.start.toIso8601String()}'),
+          key: _keys.putIfAbsent(period.start, () => GlobalKey()),
           period: period,
           view: view,
+          open: _open.contains(period.start),
+          onToggle: () => _toggle(period),
         );
       },
     );
@@ -84,10 +141,15 @@ class _PeriodTab extends StatelessWidget {
 }
 
 class _SummaryChart extends StatelessWidget {
-  const _SummaryChart({required this.view, required this.window});
+  const _SummaryChart({
+    required this.view,
+    required this.window,
+    required this.onSelect,
+  });
 
   final HistoryView view;
   final List<PeriodSummary> window;
+  final void Function(PeriodSummary period) onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +185,14 @@ class _SummaryChart extends StatelessWidget {
           _BarChart(
             values: [for (final p in window) p.reps],
             labels: [for (final p in window) chartLabel(view, p.start)],
+            onTap: (i) => onSelect(window[i]),
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: Text(
+              'Tap a bar to see the details',
+              style: textTheme.labelSmall,
+            ),
           ),
         ],
       ),
@@ -131,10 +201,15 @@ class _SummaryChart extends StatelessWidget {
 }
 
 class _BarChart extends StatelessWidget {
-  const _BarChart({required this.values, required this.labels});
+  const _BarChart({
+    required this.values,
+    required this.labels,
+    required this.onTap,
+  });
 
   final List<int> values;
   final List<String> labels;
+  final void Function(int index) onTap;
 
   static const double _maxBarHeight = 80;
 
@@ -152,34 +227,40 @@ class _BarChart extends StatelessWidget {
         children: [
           for (var i = 0; i < values.length; i++)
             Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    values[i] > 0 ? '${values[i]}' : '',
-                    style: textTheme.labelSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    height: math.max(4.0, _maxBarHeight * values[i] / maxValue),
-                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(
-                      color: values[i] == 0
-                          ? scheme.outline.withValues(alpha: 0.5)
-                          : (i == lastIndex
-                          ? AppColors.accent
-                          : AppColors.accent.withValues(alpha: 0.55)),
-                      borderRadius: BorderRadius.circular(6),
+              // The whole column (value, bar and label) is the tap target.
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(i),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      values[i] > 0 ? '${values[i]}' : '',
+                      style: textTheme.labelSmall,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    labels[i],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelSmall,
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Container(
+                      height:
+                      math.max(4.0, _maxBarHeight * values[i] / maxValue),
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: values[i] == 0
+                            ? scheme.outline.withValues(alpha: 0.5)
+                            : (i == lastIndex
+                            ? AppColors.accent
+                            : AppColors.accent.withValues(alpha: 0.55)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      labels[i],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelSmall,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -188,27 +269,28 @@ class _BarChart extends StatelessWidget {
   }
 }
 
-class _PeriodCard extends StatefulWidget {
-  const _PeriodCard({super.key, required this.period, required this.view});
+class _PeriodCard extends StatelessWidget {
+  const _PeriodCard({
+    super.key,
+    required this.period,
+    required this.view,
+    required this.open,
+    required this.onToggle,
+  });
 
   final PeriodSummary period;
   final HistoryView view;
-
-  @override
-  State<_PeriodCard> createState() => _PeriodCardState();
-}
-
-class _PeriodCardState extends State<_PeriodCard> {
-  bool _open = false;
+  final bool open;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.period;
+    final p = period;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final canOpen = !p.isEmpty;
-    final emptyLabel =
-    widget.view == HistoryView.daily ? 'Rest day' : 'No workouts';
+    final isOpen = open && canOpen;
+    final emptyLabel = view == HistoryView.daily ? 'Rest day' : 'No workouts';
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -224,7 +306,7 @@ class _PeriodCardState extends State<_PeriodCard> {
       child: Column(
         children: [
           InkWell(
-            onTap: canOpen ? () => setState(() => _open = !_open) : null,
+            onTap: canOpen ? onToggle : null,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -252,7 +334,7 @@ class _PeriodCardState extends State<_PeriodCard> {
                               ),
                               _MiniStat(
                                 icon: Icons.timer_outlined,
-                                text: '${_minutes(p.totalDuration)} min',
+                                text: '${p.totalDuration.inMinutes} min',
                               ),
                               _MiniStat(
                                 icon: Icons.verified_outlined,
@@ -280,7 +362,7 @@ class _PeriodCardState extends State<_PeriodCard> {
                         Text('reps', style: textTheme.labelSmall),
                         const SizedBox(height: 4),
                         Icon(
-                          _open
+                          isOpen
                               ? Icons.expand_less_rounded
                               : Icons.expand_more_rounded,
                           color: scheme.onSurface.withValues(alpha: 0.45),
@@ -291,14 +373,14 @@ class _PeriodCardState extends State<_PeriodCard> {
               ),
             ),
           ),
-          if (_open) _details(context, p),
+          if (isOpen) _details(context, p),
         ],
       ),
     );
   }
 
   Widget _details(BuildContext context, PeriodSummary p) {
-    if (widget.view == HistoryView.daily) {
+    if (view == HistoryView.daily) {
       // Daily: the individual sessions of that day.
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -334,15 +416,9 @@ class _PeriodCardState extends State<_PeriodCard> {
                       style: textTheme.bodyLarge,
                     ),
                   ),
-                  Text(
-                    '${d.reps} reps',
-                    style: textTheme.titleMedium,
-                  ),
+                  Text('${d.reps} reps', style: textTheme.titleMedium),
                   const SizedBox(width: 10),
-                  Text(
-                    '${d.sessions}×',
-                    style: textTheme.labelSmall,
-                  ),
+                  Text('${d.sessions}×', style: textTheme.labelSmall),
                 ],
               ),
             ),
@@ -350,8 +426,6 @@ class _PeriodCardState extends State<_PeriodCard> {
       ),
     );
   }
-
-  static int _minutes(Duration d) => d.inMinutes;
 }
 
 class _MiniStat extends StatelessWidget {
