@@ -11,6 +11,7 @@ class UserProfile {
     this.photoUrl,
     this.customDisplayName,
     this.avatarColor,
+    this.customPhotoBase64,
     this.totalReps = 0,
     this.workoutsCount = 0,
     this.weeklyReps = 0,
@@ -30,6 +31,10 @@ class UserProfile {
 
   /// Initials-circle fill as `#RRGGBB`. Null means the app accent color.
   final String? avatarColor;
+
+  /// Small JPEG chosen from the gallery, base64 encoded. When set it is shown
+  /// instead of [photoUrl] (the Google photo).
+  final String? customPhotoBase64;
 
   /// Cumulative rep count across all sessions (all-time leaderboard metric).
   final int totalReps;
@@ -73,6 +78,7 @@ class UserProfile {
       'isGuest': isGuest,
       'customDisplayName': customDisplayName,
       'avatarColor': avatarColor,
+      'customPhotoBase64': customPhotoBase64,
       'createdAt': createdAt,
       'lastLoginAt': lastLoginAt,
       'totalReps': totalReps,
@@ -91,6 +97,7 @@ class UserProfile {
       isGuest: map['isGuest'] as bool? ?? false,
       customDisplayName: map['customDisplayName'] as String?,
       avatarColor: map['avatarColor'] as String?,
+      customPhotoBase64: map['customPhotoBase64'] as String?,
       createdAt: _timestamp(map['createdAt']),
       lastLoginAt: _timestamp(map['lastLoginAt']),
       totalReps: (map['totalReps'] as num?)?.toInt() ?? 0,
@@ -101,8 +108,8 @@ class UserProfile {
   }
 
   factory UserProfile.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+      DocumentSnapshot<Map<String, dynamic>> doc,
+      ) {
     final data = doc.data();
     if (data == null) {
       throw StateError('User profile ${doc.id} has no data.');

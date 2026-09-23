@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/workout_session.dart';
 import '../theme/app_theme.dart';
+import 'push_up_icon.dart';
 
 class SessionTile extends StatelessWidget {
   const SessionTile({super.key, required this.session});
@@ -28,7 +29,9 @@ class SessionTile extends StatelessWidget {
               color: scheme.primary.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.fitness_center_rounded, color: scheme.primary),
+            child: session.exerciseId == 'pushups'
+                ? Center(child: PushUpIcon(size: 26, color: scheme.primary))
+                : Icon(Icons.fitness_center_rounded, color: scheme.primary),
           ),
           const SizedBox(width: 12),
           Expanded(

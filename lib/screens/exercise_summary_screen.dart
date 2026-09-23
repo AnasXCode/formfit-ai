@@ -19,18 +19,53 @@ class ExerciseSummaryScreen extends ConsumerStatefulWidget {
 
 class _ExerciseSummaryScreenState extends ConsumerState<ExerciseSummaryScreen> {
   bool _saving = false;
+  bool _failed = false;
 
   Future<void> _saveAndContinue() async {
     if (_saving) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _failed = false;
+    });
 
+    final messenger = ScaffoldMessenger.of(context);
     final session = ref.read(lastSessionProvider);
     final user = ref.read(authProvider);
-    if (session != null && user != null) {
-      await saveWorkoutSession(uid: user.uid, session: session);
+
+    var result = SaveResult.saved;
+    // A session with no reps has nothing worth saving.
+    if (session != null && user != null && session.reps > 0) {
+      result = await saveWorkoutSession(uid: user.uid, session: session);
     }
 
     if (!mounted) return;
+
+    if (result == SaveResult.failed) {
+      // Stay on this screen, keep the workout in memory and offer a retry.
+      setState(() {
+        _saving = false;
+        _failed = true;
+      });
+      return;
+    }
+
+    if (result == SaveResult.queued) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No connection. Your workout is stored on this phone and will '
+                'upload automatically when you are online.',
+          ),
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+
+    context.go('/home');
+  }
+
+  void _discard() {
+    ref.read(lastSessionProvider.notifier).state = null;
     context.go('/home');
   }
 
@@ -78,8 +113,8 @@ class _ExerciseSummaryScreenState extends ConsumerState<ExerciseSummaryScreen> {
                 name,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: scheme.onSurface.withValues(alpha: 0.65),
-                    ),
+                  color: scheme.onSurface.withValues(alpha: 0.65),
+                ),
               ),
               const SizedBox(height: 32),
               Row(
@@ -100,10 +135,42 @@ class _ExerciseSummaryScreenState extends ConsumerState<ExerciseSummaryScreen> {
                   padding: EdgeInsets.only(bottom: 16),
                   child: Center(child: CircularProgressIndicator()),
                 ),
+              if (_failed) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: scheme.error.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                    border: Border.all(
+                      color: scheme.error.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline_rounded, color: scheme.error),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Couldn’t save your workout. Check your connection and try again.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               PrimaryButton(
-                label: _saving ? 'Saving…' : 'Save & Continue',
+                label: _saving
+                    ? 'Saving…'
+                    : (_failed ? 'Try again' : 'Save & Continue'),
                 onPressed: _saving ? null : _saveAndContinue,
               ),
+              if (_failed)
+                TextButton(
+                  onPressed: _saving ? null : _discard,
+                  child: const Text('Discard this workout'),
+                ),
             ],
           ),
         ),

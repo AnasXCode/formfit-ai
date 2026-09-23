@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -25,9 +27,9 @@ final sessionsProvider = StreamProvider<List<WorkoutSession>>((ref) {
       .snapshots()
       .map(
         (snapshot) => snapshot.docs
-            .map(WorkoutSession.fromFirestore)
-            .toList(growable: false),
-      );
+        .map(WorkoutSession.fromFirestore)
+        .toList(growable: false),
+  );
 });
 
 /// Returns the start of the current ISO week (Monday 00:00:00 UTC).
@@ -41,12 +43,25 @@ DateTime startOfThisWeek() {
       .subtract(Duration(days: now.weekday - 1));
 }
 
+/// What happened when a workout was saved.
+enum SaveResult {
+  /// Confirmed by the server.
+  saved,
+
+  /// No connection right now. Firestore keeps the write on the phone and sends
+  /// it automatically when the internet is back, so the workout is NOT lost.
+  /// Do not save it again (that would create a duplicate).
+  queued,
+
+  /// The write was rejected (for example by the security rules). Nothing was
+  /// saved; it is safe to try again.
+  failed,
+}
+
 /// Atomically writes `users/{uid}/sessions/{autoId}` and updates the
 /// aggregate fields on `users/{uid}` (totalReps, workoutsCount, weeklyReps,
 /// weekStartDate) in a single [WriteBatch].
-///
-/// Failures are logged via [debugPrint] and not rethrown.
-Future<void> saveWorkoutSession({
+Future<SaveResult> saveWorkoutSession({
   required String uid,
   required WorkoutSession session,
 }) async {
@@ -94,9 +109,17 @@ Future<void> saveWorkoutSession({
 
     batch.update(userRef, userUpdate);
 
-    await batch.commit();
+    try {
+      // Offline, commit() never finishes on its own (Firestore waits for the
+      // server), so give it a few seconds and then treat it as queued.
+      await batch.commit().timeout(const Duration(seconds: 8));
+      return SaveResult.saved;
+    } on TimeoutException {
+      return SaveResult.queued;
+    }
   } catch (error, stackTrace) {
     debugPrint('Failed to save workout session: $error');
     debugPrint('$stackTrace');
+    return SaveResult.failed;
   }
 }

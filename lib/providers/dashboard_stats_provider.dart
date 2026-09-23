@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'theme_provider.dart' show sharedPreferencesProvider;
 
 import '../models/workout_session.dart';
 import 'leaderboard_provider.dart';
@@ -15,6 +18,9 @@ class DashboardStats {
     this.todayReps = 0,
     this.weekReps = 0,
     this.currentStreak = 0,
+    this.totalWorkouts = 0,
+    this.totalReps = 0,
+    this.bestStreak = 0,
   });
 
   /// Reps done today.
@@ -26,6 +32,15 @@ class DashboardStats {
   /// Consecutive days with at least one workout. Stays alive if you worked out
   /// yesterday but not yet today, and drops to 0 after a missed day.
   final int currentStreak;
+
+  /// Number of saved workout sessions, all time.
+  final int totalWorkouts;
+
+  /// Reps across all saved sessions, all time.
+  final int totalReps;
+
+  /// Longest run of consecutive workout days ever.
+  final int bestStreak;
 
   factory DashboardStats.fromSessions(
       List<WorkoutSession> sessions,
@@ -42,9 +57,11 @@ class DashboardStats {
 
     var todayReps = 0;
     var weekReps = 0;
+    var totalReps = 0;
     final activeDays = <DateTime>{};
 
     for (final s in sessions) {
+      totalReps += s.reps;
       if (s.reps <= 0) continue;
       final day = dayOf(s.completedAt);
       activeDays.add(day);
@@ -62,10 +79,29 @@ class DashboardStats {
       cursor = DateTime(cursor.year, cursor.month, cursor.day - 1);
     }
 
+    // Longest run of consecutive days.
+    final days = activeDays.toList()..sort();
+    var best = 0;
+    var run = 0;
+    DateTime? previous;
+    for (final d in days) {
+      if (previous != null &&
+          d == DateTime(previous.year, previous.month, previous.day + 1)) {
+        run++;
+      } else {
+        run = 1;
+      }
+      if (run > best) best = run;
+      previous = d;
+    }
+
     return DashboardStats(
       todayReps: todayReps,
       weekReps: weekReps,
       currentStreak: streak,
+      totalWorkouts: sessions.length,
+      totalReps: totalReps,
+      bestStreak: best,
     );
   }
 }
@@ -108,4 +144,29 @@ final myRankProvider = FutureProvider<int?>((ref) async {
   } catch (_) {
     return null;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Daily rep goal
+// ---------------------------------------------------------------------------
+
+const int _kDefaultDailyGoal = 30;
+const String _kDailyGoalKey = 'daily_rep_goal';
+
+/// The user's daily push-up target, saved on the phone. Defaults to 30.
+class DailyGoalNotifier extends StateNotifier<int> {
+  DailyGoalNotifier(this._prefs)
+      : super(_prefs.getInt(_kDailyGoalKey) ?? _kDefaultDailyGoal);
+
+  final SharedPreferences _prefs;
+
+  Future<void> setGoal(int reps) async {
+    final clamped = reps.clamp(1, 999);
+    state = clamped;
+    await _prefs.setInt(_kDailyGoalKey, clamped);
+  }
+}
+
+final dailyGoalProvider = StateNotifierProvider<DailyGoalNotifier, int>((ref) {
+  return DailyGoalNotifier(ref.watch(sharedPreferencesProvider));
 });

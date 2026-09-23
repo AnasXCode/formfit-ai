@@ -5,13 +5,14 @@ import 'package:go_router/go_router.dart';
 
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
-import '../providers/dummy_data.dart';
+import '../providers/dashboard_stats_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stat_chip.dart';
 import '../widgets/user_avatar.dart';
+import 'profile_photo_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -25,7 +26,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stats = ref.watch(currentUserProvider);
+    final stats = ref.watch(dashboardStatsProvider);
     final authUser = ref.watch(authProvider);
     final firestoreProfile = ref.watch(userProfileProvider).when(
       data: (UserProfile? value) => value,
@@ -38,8 +39,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final displayName = firestoreProfile?.effectiveDisplayName ??
         (isGuest
             ? 'Guest Athlete'
-            : (authUser?.displayName ?? stats.name));
-    final joinDate = firestoreProfile?.createdAt.toDate() ?? stats.joinDate;
+            : (authUser?.displayName ?? 'Athlete'));
+    final joinDate = firestoreProfile?.createdAt.toDate() ??
+        authUser?.metadata.creationTime ??
+        DateTime.now();
     final join = _formatJoin(joinDate);
 
     return Scaffold(
@@ -49,13 +52,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Column(
             children: [
-              UserAvatar(
-                radius: 44,
-                fontSize: 28,
-                photoUrl: firestoreProfile?.photoUrl,
-                avatarColorHex: firestoreProfile?.avatarColor,
-                initials: firestoreProfile?.initials ??
-                    (isGuest ? 'G' : stats.initials),
+              // Tap the picture to view it full screen or change it.
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ProfilePhotoScreen(),
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Hero(
+                      tag: kProfileAvatarHeroTag,
+                      child: UserAvatar(
+                        radius: 44,
+                        fontSize: 28,
+                        photoUrl: firestoreProfile?.photoUrl,
+                        photoBase64: firestoreProfile?.customPhotoBase64,
+                        avatarColorHex: firestoreProfile?.avatarColor,
+                        initials: firestoreProfile?.initials ??
+                            (isGuest
+                                ? 'G'
+                                : (displayName.trim().isEmpty
+                                ? '?'
+                                : displayName.trim()[0].toUpperCase())),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            width: 2,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 14),
               Text(
@@ -72,21 +115,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 24),
           Row(
             children: [
-              // TODO: replace with real sessions data
               StatChip(
                 label: 'Workouts',
-                value: '${stats.totalWorkouts}',
+                value: '${firestoreProfile?.workoutsCount ?? stats.totalWorkouts}',
                 icon: Icons.fitness_center_rounded,
               ),
               const SizedBox(width: 10),
-              // TODO: replace with real sessions data
               StatChip(
                 label: 'Total reps',
-                value: '${stats.totalReps}',
+                value: '${firestoreProfile?.totalReps ?? stats.totalReps}',
                 icon: Icons.repeat_rounded,
               ),
               const SizedBox(width: 10),
-              // TODO: replace with real sessions data
               StatChip(
                 label: 'Best streak',
                 value: '${stats.bestStreak}d',
@@ -279,7 +319,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (context) => AlertDialog(
         title: const Text('About FormFit AI'),
         content: const Text(
-          'AI pose-tracked fitness competitions. This build is UI-only: navigation, theme, and dummy data for review.',
+          'AI pose-tracked fitness competitions. Count your push-ups, check your form and climb the leaderboard.',
         ),
         actions: [
           TextButton(

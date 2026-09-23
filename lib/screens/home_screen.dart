@@ -8,6 +8,7 @@ import '../providers/dashboard_stats_provider.dart';
 import '../providers/dummy_data.dart';
 import '../providers/user_profile_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/daily_goal_ring.dart';
 import '../widgets/exercise_card.dart';
 import '../widgets/shiny_rank_chip.dart';
 import '../widgets/stat_chip.dart';
@@ -52,6 +53,7 @@ class HomeScreen extends ConsumerWidget {
                   child: UserAvatar(
                     radius: 26,
                     photoUrl: firestoreProfile?.photoUrl,
+                    photoBase64: firestoreProfile?.customPhotoBase64,
                     avatarColorHex: firestoreProfile?.avatarColor,
                     initials: firestoreProfile?.initials ??
                         (isGuest
@@ -106,6 +108,8 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 14),
+            DailyGoalRing(todayReps: stats.todayReps),
             const SizedBox(height: 28),
             Text(
               'Today’s workout',
