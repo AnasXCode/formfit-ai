@@ -40,19 +40,35 @@ Train. Compete. No dishonest reps.
 
 ## 📸 Screenshots
 
-| Home | Exercise | History |
-|---|---|---|
-| ![Home](screenshots<img width="1080" height="2400" alt="Screenshot_20261006-115116" src="https://github.com/user-attachments/assets/21832522-5ba1-4be2-9bef-87b659c12d5e" />
-<img width="1080" height="2400" alt="Screenshot_20261006-115121" src="https://github.com/user-attachments/assets/b0b4b04d-dba4-4d5a-8cba-9a505dd6aa49" />
-<img width="1080" height="2400" alt="Screenshot_20261006-115126" src="https://github.com/user-attachments/assets/687d53cb-d80e-40ea-8225-f7e532b56318" />
-<img width="1080" height="2400" alt="Screenshot_20261006-115140" src="https://github.com/user-attachments/assets/a7f4b8ea-b25e-4ee5-9d74-c56aa8a681df" />
-<img width="1920" height="1182" alt="pushup-detection-guide" src="https://github.com/user-attachments/assets/a8263532-adc2-4526-86af-56c48f0105b6" />
-<img width="1080" height="2400" alt="home png" src="https://github.com/user-attachments/assets/bdcc7356-985b-4ce4-84b7-cbf9072bca13" />
-/home.png) | ![Exercise](screenshots/exercise.png) | ![History](screenshots/history.png) |
+<table>
+  <tr>
+    <th align="center">Home</th>
+    <th align="center">Exercise</th>
+    <th align="center">History</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://github.com/user-attachments/assets/bdcc7356-985b-4ce4-84b7-cbf9072bca13" alt="Home" width="220" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/21832522-5ba1-4be2-9bef-87b659c12d5e" alt="Exercise" width="220" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/b0b4b04d-dba4-4d5a-8cba-9a505dd6aa49" alt="History" width="220" /></td>
+  </tr>
+</table>
 
-| Leaderboard | Profile |
-|---|---|
-| ![Leaderboard](screenshots/leaderboard.png) | ![Profile](screenshots/profile.png) |
+<table>
+  <tr>
+    <th align="center">Leaderboard</th>
+    <th align="center">Profile</th>
+    <th align="center">More</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/leaderboard.png" alt="Leaderboard" width="220" /></td>
+    <td align="center"><img src="screenshots/profile.png" alt="Profile" width="220" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/687d53cb-d80e-40ea-8225-f7e532b56318" alt="More" width="220" /></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/a7f4b8ea-b25e-4ee5-9d74-c56aa8a681df" alt="App screen" width="220" />
+</p>
 
 ---
 
@@ -137,6 +153,10 @@ Push-up form is evaluated from the joint positions ML Kit returns each frame:
 3. A short frame-stability window filters out single noisy detections so one bad frame can't falsely count — or reject — a rep.
 
 The same frames feed a **form score**: part rep accuracy (good reps ÷ attempted reps), part time spent in good form while actively exercising.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/a8263532-adc2-4526-86af-56c48f0105b6" alt="Push-up detection guide" width="600" />
+</p>
 
 ---
 
