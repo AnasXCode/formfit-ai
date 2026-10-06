@@ -7,7 +7,6 @@ import '../providers/auth_provider.dart';
 import '../providers/dashboard_stats_provider.dart';
 import '../providers/dummy_data.dart';
 import '../providers/user_profile_provider.dart';
-import '../theme/app_theme.dart';
 import '../widgets/daily_goal_ring.dart';
 import '../widgets/exercise_card.dart';
 import '../widgets/shiny_rank_chip.dart';
@@ -120,43 +119,6 @@ class HomeScreen extends ConsumerWidget {
                   (e) => ExerciseCard(
                 exercise: e,
                 onStart: () => context.push('/exercise/${e.id}'),
-              ),
-            ),
-            const SizedBox(height: 22),
-            Text(
-              'More exercises',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Locked for now — layout is ready.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 12),
-            ...exercises.skip(1).map(
-                  (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: ExerciseCard(exercise: e),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Pose detection will plug into the Push-Ups session next.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

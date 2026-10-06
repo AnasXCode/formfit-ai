@@ -62,27 +62,6 @@ final exercisesProvider = Provider<List<Exercise>>((ref) {
       available: true,
       subtitle: 'AI form tracking ready',
     ),
-    Exercise(
-      id: 'squats',
-      name: 'Squats',
-      icon: Icons.accessibility_new_rounded,
-      available: false,
-      subtitle: 'Coming soon',
-    ),
-    Exercise(
-      id: 'situps',
-      name: 'Sit-ups',
-      icon: Icons.self_improvement_rounded,
-      available: false,
-      subtitle: 'Coming soon',
-    ),
-    Exercise(
-      id: 'lunges',
-      name: 'Lunges',
-      icon: Icons.directions_run_rounded,
-      available: false,
-      subtitle: 'Coming soon',
-    ),
   ];
 });
 
