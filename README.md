@@ -43,32 +43,17 @@ Train. Compete. No dishonest reps.
 <table>
   <tr>
     <th align="center">Home</th>
-    <th align="center">Exercise</th>
-    <th align="center">History</th>
-  </tr>
-  <tr>
-    <td align="center"><img src="https://github.com/user-attachments/assets/bdcc7356-985b-4ce4-84b7-cbf9072bca13" alt="Home" width="220" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/21832522-5ba1-4be2-9bef-87b659c12d5e" alt="Exercise" width="220" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/b0b4b04d-dba4-4d5a-8cba-9a505dd6aa49" alt="History" width="220" /></td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <th align="center">Leaderboard</th>
     <th align="center">Profile</th>
-    <th align="center">More</th>
+    <th align="center">Leaderboard (This Week)</th>
+    <th align="center">Leaderboard (All Time)</th>
   </tr>
   <tr>
-    <td align="center"><img src="screenshots/leaderboard.png" alt="Leaderboard" width="220" /></td>
-    <td align="center"><img src="screenshots/profile.png" alt="Profile" width="220" /></td>
-    <td align="center"><img src="https://github.com/user-attachments/assets/687d53cb-d80e-40ea-8225-f7e532b56318" alt="More" width="220" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/bdcc7356-985b-4ce4-84b7-cbf9072bca13" alt="Home" width="200" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/b0b4b04d-dba4-4d5a-8cba-9a505dd6aa49" alt="Profile" width="200" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/a7f4b8ea-b25e-4ee5-9d74-c56aa8a681df" alt="Leaderboard This Week" width="200" /></td>
+    <td align="center"><img src="https://github.com/user-attachments/assets/687d53cb-d80e-40ea-8225-f7e532b56318" alt="Leaderboard All Time" width="200" /></td>
   </tr>
 </table>
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/a7f4b8ea-b25e-4ee5-9d74-c56aa8a681df" alt="App screen" width="220" />
-</p>
 
 ---
 
